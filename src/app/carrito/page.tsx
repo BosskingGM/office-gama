@@ -249,7 +249,7 @@ export default function CarritoPage() {
               onClick={clearCart}
               className="mt-4 bg-gray-200 hover:bg-gray-300 text-black px-6 py-3 rounded-xl w-full transition"
             >
-              Vaciar carrito
+              Vaciar carrito.
             </button>
           </div>
 
