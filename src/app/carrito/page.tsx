@@ -217,6 +217,9 @@ export default function CarritoPage() {
                 <option value="paqueteria">
                   Paquetería nacional ($120)
                 </option>
+                <option value="pickup">
+                  Recoger en tienda ($0)
+                </option>
               </select>
             </div>
           </div>
