@@ -1,5 +1,6 @@
 import { CartProvider } from "@/context/CartContext";
 import Navbar from "@/components/navbar";
+import AuthListener from "@/components/AuthListener";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -36,6 +37,8 @@ export default function RootLayout({
         `}
       >
         <CartProvider>
+
+          <AuthListener />
 
           <Navbar />
 
