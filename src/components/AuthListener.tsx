@@ -1,26 +1,30 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function AuthListener() {
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      // Si la sesión se pierde Y no estamos en login o registro
-      if (!session && pathname !== "/login" && pathname !== "/registro") {
-        window.location.href = "/login";
-      }
-    });
+    const checkSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
 
-    return () => {
-      subscription.unsubscribe();
+      if (error || !data.session) {
+        if (
+          pathname !== "/login" &&
+          pathname !== "/registro"
+        ) {
+          await supabase.auth.signOut();
+          router.replace("/login");
+        }
+      }
     };
-  }, [pathname]);
+
+    checkSession();
+  }, [pathname, router]);
 
   return null;
 }
