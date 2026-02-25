@@ -38,7 +38,7 @@ export default function CarritoPage() {
     0
   );
 
-  const shippingCost = shippingType === "local" ? 50 : 120;
+  const shippingCost = shippingType === "local" ? 0 : 120;
   const finalTotal = productsTotal + shippingCost;
 
   const handleCheckout = async () => {
@@ -213,7 +213,7 @@ export default function CarritoPage() {
                 onChange={(e) => setShippingType(e.target.value)}
                 className="w-full border border-gray-300 px-4 py-3 rounded-xl text-black focus:outline-none focus:ring-2 focus:ring-pink-500"
               >
-                <option value="local">Entrega local ($50)</option>
+                <option value="local">Entrega local ($0)</option>
                 <option value="paqueteria">
                   Paquetería nacional ($120)
                 </option>
