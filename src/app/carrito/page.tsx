@@ -3,6 +3,7 @@
 import { useCart } from "@/context/CartContext";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function CarritoPage() {
   const {
@@ -12,6 +13,8 @@ export default function CarritoPage() {
     increaseQuantity,
     decreaseQuantity,
   } = useCart();
+
+  const router = useRouter();
 
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -43,12 +46,11 @@ export default function CarritoPage() {
 
   const handleCheckout = async () => {
     if (!user) {
-      alert("Debes iniciar sesión para pagar");
+      router.push("/login");
       return;
     }
 
     if (!fullName || !phone || !address || !city || !postalCode) {
-      alert("Completa todos los datos de envío");
       return;
     }
 
@@ -77,12 +79,9 @@ export default function CarritoPage() {
 
       if (data.url) {
         window.location.href = data.url;
-      } else {
-        alert("Error creando sesión de pago");
       }
     } catch (error) {
       console.error(error);
-      alert("Error iniciando pago");
     } finally {
       setLoading(false);
     }
@@ -90,29 +89,28 @@ export default function CarritoPage() {
 
   if (cart.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-white p-8 sm:p-10 rounded-2xl shadow-md text-center space-y-4 max-w-md w-full">
-          <h1 className="text-2xl font-bold text-black">
+      <div className="min-h-screen bg-[#faf9ff] flex items-center justify-center px-4">
+        <div className="bg-white border border-neutral-200 p-10 rounded-3xl text-center space-y-6 max-w-md w-full">
+          <h1 className="text-2xl font-bold text-neutral-900">
             Tu carrito está vacío
           </h1>
-          <a
-            href="/"
-            className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-xl inline-block transition"
+          <button
+            onClick={() => router.push("/")}
+            className="bg-[#d6a8ff] text-black px-8 py-3 rounded-2xl font-semibold hover:opacity-90 transition"
           >
             Ir a la tienda
-          </a>
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#faf9ff]">
+      <div className="max-w-7xl mx-auto px-6 py-12">
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        <h1 className="text-3xl sm:text-4xl font-bold text-black mb-10">
-          🛒 Carrito
+        <h1 className="text-4xl font-bold text-neutral-900 mb-12">
+          Carrito
         </h1>
 
         {/* PRODUCTOS */}
@@ -120,77 +118,71 @@ export default function CarritoPage() {
           {cart.map((item) => (
             <div
               key={item.variant_id}
-              className="
-                bg-white 
-                p-5 
-                sm:p-6 
-                rounded-2xl 
-                shadow-sm 
-                flex 
-                flex-col 
-                sm:flex-row 
-                sm:justify-between 
-                sm:items-center 
-                gap-6
-              "
+              className="bg-white border border-neutral-200 rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center gap-6"
             >
-              {/* Info */}
-              <div className="flex-1">
-                <p className="text-lg sm:text-xl font-semibold text-black">
+              {/* MINIATURA */}
+              <div className="w-24 h-24 rounded-2xl overflow-hidden border border-neutral-200 bg-white shrink-0">
+                <img
+                  src={item.image_url || "/placeholder.png"}
+                  alt={item.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              {/* INFO */}
+              <div className="flex-1 space-y-2">
+                <p className="text-lg font-semibold text-neutral-900">
                   {item.name}
                 </p>
-                <p className="text-gray-600">
+                <p className="text-neutral-600 text-sm">
                   Modelo: {item.model_name}
                 </p>
-                <p className="text-pink-600 font-bold text-lg mt-1">
+                <p className="text-lg font-semibold text-neutral-900">
                   ${item.price} MXN
                 </p>
 
-                {/* Cantidad */}
-                <div className="flex items-center gap-4 mt-4">
+                <div className="flex items-center gap-4 pt-2">
                   <button
                     onClick={() => decreaseQuantity(item.variant_id)}
-                    className="w-9 h-9 flex items-center justify-center rounded-full bg-pink-500 text-white font-bold hover:bg-pink-600 transition"
+                    className="w-10 h-10 rounded-xl border border-neutral-300 hover:bg-[#f3e8ff] transition"
                   >
-                    -
+                    −
                   </button>
 
-                  <span className="text-lg font-bold text-black">
+                  <span className="text-lg font-semibold text-neutral-900">
                     {item.quantity}
                   </span>
 
                   <button
                     onClick={() => increaseQuantity(item.variant_id)}
-                    className="w-9 h-9 flex items-center justify-center rounded-full bg-pink-500 text-white font-bold hover:bg-pink-600 transition"
+                    className="w-10 h-10 rounded-xl border border-neutral-300 hover:bg-[#f3e8ff] transition"
                   >
                     +
                   </button>
                 </div>
               </div>
 
-              {/* Botón eliminar */}
-              <div className="sm:text-right">
-                <button
-                  onClick={() => removeFromCart(item.variant_id)}
-                  className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg transition w-full sm:w-auto"
-                >
-                  Eliminar
-                </button>
-              </div>
+              {/* ELIMINAR */}
+              <button
+                onClick={() => removeFromCart(item.variant_id)}
+                className="text-sm text-neutral-500 hover:text-red-600 transition"
+              >
+                Eliminar
+              </button>
             </div>
           ))}
         </div>
 
-        {/* GRID PRINCIPAL */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mt-14">
+        {/* GRID */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mt-16">
 
-          {/* FORMULARIO */}
-          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm">
-            <h2 className="text-2xl font-bold text-black mb-6">
-              📦 Información de envío
+          {/* FORM */}
+          <div className="bg-white border border-neutral-200 p-8 rounded-3xl">
+            <h2 className="text-2xl font-bold text-neutral-900 mb-8">
+              Información de envío
             </h2>
 
-            <div className="space-y-5">
+            <div className="space-y-6">
               {[ 
                 { value: fullName, set: setFullName, placeholder: "Nombre completo" },
                 { value: phone, set: setPhone, placeholder: "Teléfono" },
@@ -204,52 +196,51 @@ export default function CarritoPage() {
                   placeholder={field.placeholder}
                   value={field.value}
                   onChange={(e) => field.set(e.target.value)}
-                  className="w-full border border-gray-300 px-4 py-3 rounded-xl text-black focus:outline-none focus:ring-2 focus:ring-pink-500"
+                  className="w-full border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#d6a8ff] transition"
                 />
               ))}
 
               <select
                 value={shippingType}
                 onChange={(e) => setShippingType(e.target.value)}
-                className="w-full border border-gray-300 px-4 py-3 rounded-xl text-black focus:outline-none focus:ring-2 focus:ring-pink-500"
+                className="w-full border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#d6a8ff] transition"
               >
                 <option value="local">Entrega local ($50)</option>
                 <option value="paqueteria">
                   Paquetería nacional ($120)
                 </option>
-              
               </select>
             </div>
           </div>
 
           {/* RESUMEN */}
-          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm h-fit">
-            <h2 className="text-2xl font-bold text-black mb-6">
-              🧾 Resumen
+          <div className="bg-white border border-neutral-200 p-8 rounded-3xl h-fit">
+            <h2 className="text-2xl font-bold text-neutral-900 mb-8">
+              Resumen
             </h2>
 
-            <div className="space-y-3 text-black">
+            <div className="space-y-3 text-neutral-700">
               <p>Productos: ${productsTotal} MXN</p>
               <p>Envío: ${shippingCost} MXN</p>
             </div>
 
-            <h3 className="text-2xl sm:text-3xl font-bold text-black mt-6">
+            <h3 className="text-3xl font-bold text-neutral-900 mt-8">
               Total: ${finalTotal} MXN
             </h3>
 
             <button
               onClick={handleCheckout}
               disabled={loading}
-              className="mt-8 bg-pink-500 hover:bg-pink-600 text-white font-semibold px-6 py-3 rounded-xl w-full transition disabled:bg-gray-400"
+              className="mt-10 bg-[#d6a8ff] text-black font-semibold px-6 py-4 rounded-2xl w-full hover:opacity-90 transition disabled:opacity-50"
             >
               {loading ? "Procesando..." : "Pagar con tarjeta"}
             </button>
 
             <button
               onClick={clearCart}
-              className="mt-4 bg-gray-200 hover:bg-gray-300 text-black px-6 py-3 rounded-xl w-full transition"
+              className="mt-4 border border-neutral-300 text-neutral-700 px-6 py-4 rounded-2xl w-full hover:bg-neutral-100 transition"
             >
-              Vaciar carrito.
+              Vaciar carrito
             </button>
           </div>
 

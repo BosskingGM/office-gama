@@ -23,48 +23,49 @@ export default function ProductCard({ product }: any) {
 
   return (
     <div className="
-      bg-white 
-      rounded-2xl 
-      shadow-sm 
-      hover:shadow-xl 
-      transition 
-      duration-300 
+      bg-white
+      border
+      border-neutral-200
+      rounded-3xl
       overflow-hidden
-      flex 
+      transition
+      duration-300
+      hover:shadow-lg
+      flex
       flex-col
     ">
 
       {/* Imagen */}
-      <div className="relative w-full aspect-[4/3] bg-gray-100">
+      <div className="relative w-full aspect-[4/3] bg-neutral-100 overflow-hidden">
         {images[index] ? (
           <img
             src={images[index]}
             alt={product.name}
-            className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
           />
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+          <div className="flex items-center justify-center h-full text-neutral-400 text-sm">
             Sin imagen
           </div>
         )}
       </div>
 
       {/* Contenido */}
-      <div className="flex flex-col flex-1 p-4 space-y-2">
+      <div className="flex flex-col flex-1 p-5 space-y-3">
 
         <h2 className="
-          text-black 
-          font-semibold 
-          text-base 
-          sm:text-lg 
+          text-neutral-900
+          font-semibold
+          text-base
+          sm:text-lg
           line-clamp-2
         ">
           {product.name}
         </h2>
 
         <p className="
-          text-pink-600 
-          font-bold 
+          text-neutral-800
+          font-semibold
           text-lg
         ">
           ${product.price} MXN
@@ -75,14 +76,14 @@ export default function ProductCard({ product }: any) {
           href={`/producto/${product.id}`}
           className="
             mt-auto
-            bg-pink-500 
-            hover:bg-pink-600 
-            text-white 
-            py-2.5 
-            rounded-xl 
-            text-center 
-            font-semibold 
+            bg-[#d6a8ff]
+            text-black
+            py-3
+            rounded-2xl
+            text-center
+            font-semibold
             transition
+            hover:opacity-90
             w-full
           "
         >

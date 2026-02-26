@@ -12,35 +12,43 @@ export default function SuccessPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 lg:p-10 text-center w-full max-w-lg space-y-5 sm:space-y-6">
-        
-        <div className="text-green-500 text-4xl sm:text-5xl">
-          ✔
+    <div className="min-h-screen bg-[#faf9ff] flex items-center justify-center px-6 py-16">
+      <div className="bg-white border border-neutral-200 rounded-3xl p-10 sm:p-14 text-center w-full max-w-xl space-y-8">
+
+        {/* ICONO */}
+        <div className="mx-auto w-20 h-20 rounded-full bg-[#f3e8ff] flex items-center justify-center text-3xl">
+          ✓
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-bold text-black">
-          ¡Pago exitoso!
+        {/* TITULO */}
+        <h1 className="text-3xl sm:text-4xl font-bold text-neutral-900">
+          Pago confirmado
         </h1>
 
-        <p className="text-gray-600 text-sm sm:text-base">
+        {/* DESCRIPCION */}
+        <p className="text-neutral-600 leading-relaxed">
           Tu pedido ha sido procesado correctamente.
-          Recibirás una confirmación pronto.
+          Recibirás un correo de confirmación con los detalles de tu compra.
         </p>
 
-        <Link
-          href="/cuenta"
-          className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-xl block w-full sm:w-auto"
-        >
-          Ver mis pedidos
-        </Link>
+        {/* BOTONES */}
+        <div className="space-y-4 pt-4">
 
-        <Link
-          href="/"
-          className="text-gray-500 hover:text-black block text-sm sm:text-base"
-        >
-          Volver a la tienda
-        </Link>
+          <Link
+            href="/cuenta"
+            className="block w-full bg-[#d6a8ff] text-black font-semibold py-4 rounded-2xl hover:opacity-90 transition"
+          >
+            Ver mis pedidos
+          </Link>
+
+          <Link
+            href="/"
+            className="block w-full border border-neutral-300 text-neutral-700 py-4 rounded-2xl hover:bg-neutral-100 transition"
+          >
+            Volver a la tienda
+          </Link>
+
+        </div>
       </div>
     </div>
   );

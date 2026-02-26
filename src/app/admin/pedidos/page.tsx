@@ -37,8 +37,7 @@ export default function AdminPedidos() {
 
   const handleUpdateStatus = async (
     orderId: string,
-    newStatus: string,
-    userEmail: string
+    newStatus: string
   ) => {
     setLoading(true);
 
@@ -48,217 +47,189 @@ export default function AdminPedidos() {
       .eq("id", orderId);
 
     if (error) {
-      alert("No se pudo actualizar el estado");
       setLoading(false);
       return;
     }
 
-  if (newStatus === "enviado") {
-  await fetch("/api/send-shipped-email", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      orderId: orderId,
-    }),
-  });
-}
+    if (newStatus === "enviado") {
+      await fetch("/api/send-shipped-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+    }
 
     await fetchOrders();
     setSelectedOrder(null);
     setLoading(false);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusStyle = (status: string) => {
     switch (status) {
       case "pagado":
-        return "bg-green-600 text-white";
+        return "bg-neutral-200 text-neutral-900";
       case "enviado":
-        return "bg-blue-600 text-white";
+        return "bg-[#d6a8ff] text-black";
       case "entregado":
-        return "bg-purple-700 text-white";
+        return "bg-neutral-900 text-white";
       case "cancelado":
-        return "bg-red-600 text-white";
+        return "bg-neutral-300 text-neutral-700";
       default:
-        return "bg-gray-500 text-white";
+        return "bg-neutral-200 text-neutral-800";
     }
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 bg-white min-h-screen text-black">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-6 text-black">
-        Gestión de Pedidos
-      </h1>
+    <div className="min-h-screen bg-[#faf9ff] px-6 py-12">
+      <div className="max-w-6xl mx-auto space-y-10">
 
-      <div className="space-y-4">
-        {orders.map((order) => (
-          <div
-            key={order.id}
-            className="p-4 border rounded-xl shadow hover:shadow-lg cursor-pointer 
-                       flex flex-col sm:flex-row sm:justify-between sm:items-center 
-                       gap-3 bg-white"
-            onClick={() => setSelectedOrder(order)}
-          >
-            <div>
-              <p className="font-semibold text-black">
-                Pedido #{order.id.slice(0, 8)}
-              </p>
-              <p className="text-sm text-black break-all">
-                {new Date(order.created_at).toLocaleString()}
-              </p>
-            </div>
+        <h1 className="text-3xl font-bold text-neutral-900">
+          Gestión de pedidos
+        </h1>
 
-            <div className="sm:text-right">
-              <p className="font-bold text-black">
-                ${order.total} MXN
-              </p>
-              <span
-                className={`inline-block mt-1 px-3 py-1 rounded-full text-sm ${getStatusColor(
-                  order.status
-                )}`}
-              >
-                {order.status}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {selectedOrder && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white w-full sm:w-[520px] max-h-[90vh] overflow-y-auto 
-                          p-5 sm:p-6 rounded-t-2xl sm:rounded-2xl shadow-xl relative text-black">
-            <button
-              className="absolute top-3 right-3 text-red-600 font-bold text-lg"
-              onClick={() => setSelectedOrder(null)}
+        {/* LISTA */}
+        <div className="space-y-4">
+          {orders.map((order) => (
+            <div
+              key={order.id}
+              onClick={() => setSelectedOrder(order)}
+              className="bg-white border border-neutral-200 rounded-2xl p-6 cursor-pointer hover:shadow-md transition flex flex-col sm:flex-row sm:justify-between gap-4"
             >
-              X
-            </button>
+              <div>
+                <p className="font-semibold text-neutral-900">
+                  Pedido #{order.id.slice(0, 8)}
+                </p>
+                <p className="text-sm text-neutral-500">
+                  {new Date(order.created_at).toLocaleString()}
+                </p>
+              </div>
 
-            <h2 className="text-lg sm:text-xl font-bold text-black mb-2">
-              Pedido #{selectedOrder.id.slice(0, 8)}
-            </h2>
-
-            <p className="mb-4 text-black">
-              Total: <strong>${selectedOrder.total} MXN</strong>
-            </p>
-
-            {/* Información del cliente */}
-            <div className="mt-4 p-4 border rounded-xl bg-gray-50 space-y-2 text-sm">
-              <h3 className="font-bold text-black">Información del cliente</h3>
-
-              <p><strong>Nombre:</strong> {selectedOrder.full_name}</p>
-              <p><strong>Email:</strong> {selectedOrder.user_email}</p>
-              <p><strong>Teléfono:</strong> {selectedOrder.phone}</p>
-            </div>
-
-            {/* Dirección */}
-            <div className="mt-4 p-4 border rounded-xl bg-gray-50 space-y-2 text-sm">
-              <h3 className="font-bold text-black">Dirección de envío</h3>
-
-              <p><strong>Dirección:</strong> {selectedOrder.address}</p>
-              <p><strong>Ciudad:</strong> {selectedOrder.city}</p>
-              <p><strong>Código Postal:</strong> {selectedOrder.postal_code}</p>
-              <p><strong>Tipo de envío:</strong> {selectedOrder.shipping_type}</p>
-              <p><strong>Costo envío:</strong> ${selectedOrder.shipping_cost} MXN</p>
-            </div>
-
-            {/* Productos */}
-            <div className="space-y-3 mt-4">
-              {selectedOrder.order_items.map((item: any) => (
-                <div
-                  key={item.id}
-                  className="flex flex-col sm:flex-row items-center gap-4 border p-3 rounded-lg bg-white"
+              <div className="sm:text-right">
+                <p className="font-semibold text-neutral-900">
+                  ${order.total} MXN
+                </p>
+                <span
+                  className={`inline-block mt-2 px-4 py-1 rounded-full text-xs font-medium ${getStatusStyle(
+                    order.status
+                  )}`}
                 >
-                  <img
-                    src={
-                      item.product_variants?.image_url
-                        ? item.product_variants.image_url
-                        : "https://via.placeholder.com/150"
-                    }
-                    alt="producto"
-                    className="w-full sm:w-20 h-48 sm:h-20 object-cover rounded border"
-                  />
-
-                  <div className="text-center sm:text-left">
-                    <p className="font-semibold text-black">
-                      {item.product_variants?.products?.name}
-                    </p>
-
-                    <p className="text-black">
-                      Cantidad: {item.quantity}
-                    </p>
-
-                    <p className="text-black">
-                      Precio: ${item.price}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                  {order.status}
+                </span>
+              </div>
             </div>
+          ))}
+        </div>
 
-            {/* Botones de estado */}
-            <div className="flex flex-col sm:flex-row gap-2 mt-6">
-              <button
-                disabled={loading}
-                onClick={() =>
-                  handleUpdateStatus(
-                    selectedOrder.id,
-                    "pagado",
-                    selectedOrder.user_email
-                  )
-                }
-                className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
-              >
-                Marcar pagado
-              </button>
+        {/* MODAL */}
+        {selectedOrder && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-8 space-y-6 relative border border-neutral-200">
 
               <button
-                disabled={loading}
-                onClick={() =>
-                  handleUpdateStatus(
-                    selectedOrder.id,
-                    "enviado",
-                    selectedOrder.user_email
-                  )
-                }
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+                onClick={() => setSelectedOrder(null)}
+                className="absolute top-5 right-6 text-neutral-500 hover:text-neutral-900 text-lg"
               >
-                Marcar enviado
+                ✕
               </button>
 
-              <button
-                disabled={loading}
-                onClick={() =>
-                  handleUpdateStatus(
-                    selectedOrder.id,
-                    "entregado",
-                    selectedOrder.user_email
-                  )
-                }
-                className="w-full bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-lg"
-              >
-                Marcar entregado
-              </button>
+              <h2 className="text-2xl font-semibold text-neutral-900">
+                Pedido #{selectedOrder.id.slice(0, 8)}
+              </h2>
 
-              <button
-                disabled={loading}
-                onClick={() =>
-                  handleUpdateStatus(
-                    selectedOrder.id,
-                    "cancelado",
-                    selectedOrder.user_email
+              <p className="text-neutral-700">
+                Total: <strong>${selectedOrder.total} MXN</strong>
+              </p>
+
+              {/* Cliente */}
+              <Section title="Cliente">
+                <p>{selectedOrder.full_name}</p>
+                <p>{selectedOrder.user_email}</p>
+                <p>{selectedOrder.phone}</p>
+              </Section>
+
+              {/* Dirección */}
+              <Section title="Dirección">
+                <p>{selectedOrder.address}</p>
+                <p>{selectedOrder.city}</p>
+                <p>CP: {selectedOrder.postal_code}</p>
+                <p>Envío: {selectedOrder.shipping_type}</p>
+              </Section>
+
+              {/* Productos */}
+              <Section title="Productos">
+                <div className="space-y-4">
+                  {selectedOrder.order_items.map((item: any) => (
+                    <div
+                      key={item.id}
+                      className="flex gap-4 border border-neutral-200 rounded-2xl p-4"
+                    >
+                      <img
+                        src={
+                          item.product_variants?.image_url ||
+                          "https://via.placeholder.com/100"
+                        }
+                        alt="producto"
+                        className="w-20 h-20 object-cover rounded-xl"
+                      />
+
+                      <div>
+                        <p className="font-medium text-neutral-900">
+                          {item.product_variants?.products?.name}
+                        </p>
+                        <p className="text-sm text-neutral-500">
+                          Cantidad: {item.quantity}
+                        </p>
+                        <p className="text-sm text-neutral-500">
+                          Precio: ${item.price}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+
+              {/* BOTONES */}
+              <div className="grid grid-cols-2 gap-3 pt-4">
+                {["pagado", "enviado", "entregado", "cancelado"].map(
+                  (status) => (
+                    <button
+                      key={status}
+                      disabled={loading}
+                      onClick={() =>
+                        handleUpdateStatus(selectedOrder.id, status)
+                      }
+                      className="bg-neutral-900 text-white py-3 rounded-2xl hover:opacity-90 transition text-sm"
+                    >
+                      Marcar {status}
+                    </button>
                   )
-                }
-                className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
-              >
-                Cancelar
-              </button>
+                )}
+              </div>
+
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border border-neutral-200 rounded-2xl p-6 space-y-2">
+      <h3 className="font-semibold text-neutral-900">
+        {title}
+      </h3>
+      <div className="text-neutral-700 text-sm space-y-1">
+        {children}
+      </div>
     </div>
   );
 }

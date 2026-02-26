@@ -1,26 +1,129 @@
 @import "tailwindcss";
 
+/* =========================
+   🎨 SISTEMA DE COLOR
+========================= */
+
 :root {
+  /* Fondo */
   --background: #ffffff;
-  --foreground: #ffffff;
+  --background-soft: #faf9ff;
+
+  /* Texto */
+  --foreground: #111111;
+  --text-secondary: #4b5563; /* gris medio visible */
+  --text-muted: #6b7280;
+
+  /* Color principal de marca */
+  --primary: #d6a8ff;
+  --primary-hover: #c084fc;
+  --primary-soft: #f3e8ff;
+
+  /* Bordes */
+  --border-soft: #e5e7eb;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* =========================
+   🌙 MODO OSCURO DESACTIVADO
+   (minimalista claro premium)
+========================= */
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #ffffff;
-    --foreground: #ededed;
+    --foreground: #111111;
   }
 }
+
+/* =========================
+   🧠 BASE GLOBAL
+========================= */
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans, Arial, Helvetica, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* =========================
+   ✨ SELECCIÓN DE TEXTO
+========================= */
+
+::selection {
+  background: var(--primary);
+  color: #111;
+}
+
+/* =========================
+   🖱 SCROLL ELEGANTE
+========================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-soft);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* =========================
+   🔘 BOTONES BASE
+========================= */
+
+.btn-primary {
+  background: var(--primary);
+  color: #111;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+.btn-outline {
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  transition: all 0.2s ease;
+}
+
+.btn-outline:hover {
+  background: var(--primary-soft);
+}
+
+/* =========================
+   📦 CARDS PREMIUM
+========================= */
+
+.card {
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  border-radius: 1rem;
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
+}
+
+/* =========================
+   🧾 TEXTO UTILIDADES
+========================= */
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-muted {
+  color: var(--text-muted);
 }

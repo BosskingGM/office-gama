@@ -40,10 +40,12 @@ export default function RootLayout({
         className={`
           ${geistSans.variable}
           ${geistMono.variable}
-          bg-gray-50
+          bg-[#faf9ff]
+          text-neutral-900
           min-h-screen
-          text-black
-          flex flex-col
+          flex
+          flex-col
+          antialiased
         `}
       >
         <CartProvider>
@@ -52,9 +54,11 @@ export default function RootLayout({
 
           <Navbar />
 
-          {/* Contenedor principal */}
-          <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
-            {children}
+          {/* CONTENIDO GLOBAL */}
+          <main className="flex-1 w-full">
+            <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 py-10">
+              {children}
+            </div>
           </main>
 
           <Footer />

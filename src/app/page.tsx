@@ -57,7 +57,6 @@ export default function HomePage() {
     }
   };
 
-  // 🔥 FILTRO COMBINADO (categoría + búsqueda)
   const filteredProducts = products.filter((product) => {
     const matchesCategory =
       !selectedCategory || product.category === selectedCategory;
@@ -70,37 +69,43 @@ export default function HomePage() {
   });
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#faf9ff]">
 
-      {/* 🎀 HERO SECTION PREMIUM */}
-      <div className="bg-gradient-to-r from-pink-100 to-pink-50 py-16">
-        <div className="max-w-7xl mx-auto px-6 text-center space-y-6">
-          <h1 className="text-4xl sm:text-5xl font-bold text-black">
-            Papelería Importada ✨
+      {/* HERO PREMIUM */}
+      <div className="py-24">
+        <div className="max-w-5xl mx-auto px-6 text-center space-y-8">
+
+
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-neutral-900 leading-tight">
+            Papelería Importada
+            <span className="block text-[#d6a8ff]">
+              Diseño que inspira
+            </span>
           </h1>
 
-          <p className="text-lg text-gray-700 max-w-2xl mx-auto">
-            Diseños únicos, calidad premium y artículos que no encontrarás en cualquier tienda.
+          <p className="text-lg text-neutral-600 max-w-2xl mx-auto">
+            Diseños únicos, calidad premium y artículos cuidadosamente seleccionados
+            para quienes valoran los detalles.
           </p>
 
           <button
             onClick={() =>
-              window.scrollTo({ top: 600, behavior: "smooth" })
+              window.scrollTo({ top: 700, behavior: "smooth" })
             }
-            className="bg-pink-500 hover:bg-pink-600 text-white px-8 py-3 rounded-xl transition shadow-md"
+            className="bg-[#d6a8ff] hover:opacity-90 text-black px-10 py-4 rounded-2xl font-semibold shadow-md transition"
           >
             Explorar catálogo
           </button>
         </div>
       </div>
 
-      {/* 🏷️ CATEGORÍAS DESLIZABLES */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
-        <h2 className="text-xl font-semibold text-black mb-4">
+      {/* CATEGORÍAS */}
+      <div className="max-w-7xl mx-auto px-6 mb-10">
+        <h2 className="text-xl font-semibold text-neutral-900 mb-6">
           Categorías
         </h2>
 
-        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+        <div className="flex gap-4 overflow-x-auto pb-4">
           {categories.map((cat, index) => {
             const isActive = selectedCategory === cat;
 
@@ -108,25 +113,23 @@ export default function HomePage() {
               <div
                 key={index}
                 onClick={() =>
-                  setSelectedCategory(
-                    isActive ? null : cat
-                  )
+                  setSelectedCategory(isActive ? null : cat)
                 }
                 className={`
                   min-w-max
-                  px-5
+                  px-6
                   py-2
                   rounded-full
                   text-sm
                   font-medium
                   cursor-pointer
                   whitespace-nowrap
-                  shadow-sm
+                  border
                   transition
                   ${
                     isActive
-                      ? "bg-pink-500 text-white"
-                      : "bg-pink-50 text-black hover:bg-pink-500 hover:text-white"
+                      ? "bg-[#d6a8ff] text-black border-[#d6a8ff]"
+                      : "bg-white text-neutral-700 border-neutral-200 hover:border-[#d6a8ff] hover:text-neutral-900"
                   }
                 `}
               >
@@ -137,41 +140,42 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* CONTENEDOR PRINCIPAL */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      {/* CONTENIDO PRINCIPAL */}
+      <div className="max-w-7xl mx-auto px-6 pb-20">
 
-        {/* 🔍 Buscador */}
-        <div className="mb-8 flex justify-center sm:justify-start">
+        {/* BUSCADOR */}
+        <div className="mb-10 flex justify-center sm:justify-start">
           <input
             type="text"
             placeholder="Buscar productos..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="
-              w-full 
+              w-full
               sm:w-96
-              border 
-              border-gray-300 
-              rounded-xl 
-              px-4 
-              py-3 
-              text-black
-              focus:outline-none 
-              focus:ring-2 
-              focus:ring-pink-500
+              border
+              border-neutral-300
+              rounded-2xl
+              px-5
+              py-3
+              text-neutral-900
+              bg-white
+              focus:outline-none
+              focus:ring-2
+              focus:ring-[#d6a8ff]
               transition
             "
           />
         </div>
 
-        {/* 🛍 GRID ACTUALIZADO */}
+        {/* GRID */}
         <div className="
-          grid 
-          grid-cols-2 
-          sm:grid-cols-2 
-          lg:grid-cols-3 
-          xl:grid-cols-4 
-          gap-4
+          grid
+          grid-cols-2
+          sm:grid-cols-2
+          lg:grid-cols-3
+          xl:grid-cols-4
+          gap-6
         ">
           {filteredProducts.map((product) => (
             <ProductCard

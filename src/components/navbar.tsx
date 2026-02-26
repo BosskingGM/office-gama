@@ -52,136 +52,145 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="w-full bg-white border-b shadow-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
+    <>
+      {/* NAVBAR */}
+      <nav className="w-full bg-white border-b border-neutral-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-20">
 
-          {/* 🔥 LOGO MÁS GRANDE */}
-          <Link href="/" className="flex items-center">
-            <img
-              src="/logo.png"
-              alt="Office GaMa"
-              className="h-12 sm:h-14 w-auto object-contain transition hover:scale-105"
-            />
-          </Link>
-
-          {/* Desktop */}
-          <div className="hidden md:flex gap-6 items-center text-black font-medium">
-            <Link href="/" className="hover:text-pink-500 transition">
-              Inicio
+            {/* LOGO */}
+            <Link href="/" className="flex items-center">
+              <img
+                src="/logo.png"
+                alt="Office Gama"
+                className="h-12 sm:h-14 w-auto object-contain transition duration-200 hover:scale-[1.03]"
+              />
             </Link>
 
-            <Link href="/carrito" className="relative text-xl">
-              🛒
-              {cart.length > 0 && (
-                <span className="absolute -top-2 -right-3 bg-pink-500 text-white text-xs px-2 rounded-full">
-                  {cart.length}
-                </span>
-              )}
-            </Link>
+            {/* DESKTOP */}
+            <div className="hidden md:flex gap-8 items-center text-neutral-800 font-medium">
 
-            <Link href="/cuenta" className="hover:text-pink-500 transition">
-              Mis pedidos
-            </Link>
-
-            {isAdmin && (
-              <Link
-                href="/admin"
-                className="bg-black text-white px-4 py-2 rounded-lg hover:opacity-90 transition"
-              >
-                Admin
+              <Link href="/" className="hover:text-[#d6a8ff] transition duration-200">
+                Inicio
               </Link>
-            )}
 
-            {user ? (
-              <>
-                <span className="text-sm text-black">{user.email}</span>
-                <button
-                  onClick={handleLogout}
-                  className="text-red-500 hover:opacity-80 transition"
+              <Link href="/carrito" className="relative text-xl">
+                🛒
+                {cart.length > 0 && (
+                  <span className="absolute -top-2 -right-3 bg-[#d6a8ff] text-black text-xs px-2 py-0.5 rounded-full font-semibold shadow-sm">
+                    {cart.length}
+                  </span>
+                )}
+              </Link>
+
+              <Link href="/cuenta" className="hover:text-[#d6a8ff] transition duration-200">
+                Mis pedidos
+              </Link>
+
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className="px-4 py-2 rounded-xl border border-neutral-200 hover:border-[#d6a8ff] hover:bg-[#f3e8ff] transition duration-200"
                 >
-                  Cerrar sesión
-                </button>
-              </>
-            ) : (
-              <>
-                <Link href="/login" className="hover:text-pink-500 transition">
-                  Login
+                  Admin
                 </Link>
-                <Link href="/registro" className="hover:text-pink-500 transition">
-                  Registro
-                </Link>
-              </>
-            )}
+              )}
+
+              {user ? (
+                <>
+                  <span className="text-sm text-neutral-600 max-w-[160px] truncate">
+                    {user.email}
+                  </span>
+
+                  <button
+                    onClick={handleLogout}
+                    className="text-sm text-neutral-600 hover:text-neutral-900 transition"
+                  >
+                    Cerrar sesión
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" className="hover:text-[#d6a8ff] transition duration-200">
+                    Login
+                  </Link>
+
+                  <Link
+                    href="/registro"
+                    className="px-4 py-2 rounded-xl bg-[#d6a8ff] text-black hover:opacity-90 transition duration-200"
+                  >
+                    Registro
+                  </Link>
+                </>
+              )}
+            </div>
+
+            {/* MOBILE BUTTON */}
+            <button
+              onClick={() => setOpen(true)}
+              className="md:hidden text-2xl text-neutral-800"
+            >
+              ☰
+            </button>
           </div>
-
-          {/* Mobile Button */}
-          <button
-            onClick={() => setOpen(true)}
-            className="md:hidden text-2xl text-black"
-          >
-            ☰
-          </button>
         </div>
-      </div>
+      </nav>
 
-      {/* MOBILE DRAWER */}
-      <div
-        className={`fixed inset-0 z-50 md:hidden transition-all duration-300 ${
-          open ? "visible opacity-100" : "invisible opacity-0"
-        }`}
-      >
-        <div
-          className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-          onClick={() => setOpen(false)}
-        />
+      {/* MOBILE DRAWER OVERLAY */}
+      {open && (
+        <div className="fixed inset-0 z-[999] md:hidden">
 
-        <div
-          className={`absolute right-0 top-0 h-full w-72 bg-white shadow-xl transform transition-transform duration-300 ${
-            open ? "translate-x-0" : "translate-x-full"
-          }`}
-        >
-          <div className="p-6 space-y-6">
+          {/* BACKDROP */}
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setOpen(false)}
+          />
+
+          {/* DRAWER */}
+          <div className="absolute right-0 top-0 h-full w-72 bg-white shadow-2xl p-6 space-y-6">
+
             <div className="flex justify-between items-center">
-              <span className="text-lg font-semibold text-pink-500">
+              <span className="text-lg font-semibold text-neutral-900">
                 Menú
               </span>
               <button
                 onClick={() => setOpen(false)}
-                className="text-gray-500 text-xl"
+                className="text-neutral-500 text-xl hover:text-neutral-900 transition"
               >
                 ✕
               </button>
             </div>
 
-            <div className="border-t" />
+            <div className="border-t border-neutral-200" />
 
-            <div className="space-y-4 text-black font-medium">
+            <div className="space-y-4 text-neutral-800 font-medium">
               <Link href="/" onClick={() => setOpen(false)} className="block">
                 Inicio
               </Link>
+
               <Link href="/carrito" onClick={() => setOpen(false)} className="block">
                 Carrito ({cart.length})
               </Link>
+
               <Link href="/cuenta" onClick={() => setOpen(false)} className="block">
-                Mi cuenta
+                Mis pedidos
               </Link>
 
               {isAdmin && (
                 <Link
                   href="/admin"
                   onClick={() => setOpen(false)}
-                  className="block bg-pink-500 text-white px-4 py-2 rounded-lg text-center"
+                  className="block border border-neutral-200 px-4 py-2 rounded-xl text-center hover:bg-[#f3e8ff] transition"
                 >
                   Admin
                 </Link>
               )}
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t border-neutral-200 pt-4 space-y-3">
               {user ? (
                 <>
-                  <span className="block text-xs text-gray-500 break-all">
+                  <span className="block text-sm text-neutral-600 break-all">
                     {user.email}
                   </span>
                   <button
@@ -189,7 +198,7 @@ export default function Navbar() {
                       handleLogout();
                       setOpen(false);
                     }}
-                    className="text-sm text-gray-500 hover:text-red-500"
+                    className="text-sm text-neutral-600 hover:text-neutral-900 transition"
                   >
                     Cerrar sesión
                   </button>
@@ -199,15 +208,21 @@ export default function Navbar() {
                   <Link href="/login" onClick={() => setOpen(false)} className="block">
                     Login
                   </Link>
-                  <Link href="/registro" onClick={() => setOpen(false)} className="block">
+
+                  <Link
+                    href="/registro"
+                    onClick={() => setOpen(false)}
+                    className="block bg-[#d6a8ff] text-black px-4 py-2 rounded-xl text-center"
+                  >
                     Registro
                   </Link>
                 </>
               )}
             </div>
+
           </div>
         </div>
-      </div>
-    </nav>
+      )}
+    </>
   );
 }

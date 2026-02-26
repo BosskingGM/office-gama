@@ -15,33 +15,14 @@ export default function InventarioPage() {
   const [variants, setVariants] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // ✅ NUEVOS ESTADOS (NO ROMPEN NADA)
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
 
   const categories = [
-    "Sacapuntas",
-    "Libretas",
-    "Washi Tapes",
-    "Stickers",
-    "Tintas",
-    "Sellos",
-    "Post It",
-    "Plumones",
-    "Folders",
-    "Plumas",
-    "Pegamento",
-    "Extras",
-    "Marca Textos",
-    "Cutters",
-    "Lapiceras",
-    "Crayolas",
-    "Lacre",
-    "Gises",
-    "Colores",
-    "Correctores",
-    "Juegos Geométricos",
-    "Liquidación",
+    "Sacapuntas","Libretas","Washi Tapes","Stickers","Tintas","Sellos","Post It",
+    "Plumones","Folders","Plumas","Pegamento","Extras","Marca Textos","Cutters",
+    "Lapiceras","Crayolas","Lacre","Gises","Colores","Correctores",
+    "Juegos Geométricos","Liquidación",
   ];
 
   const fetchProducts = async () => {
@@ -221,7 +202,6 @@ export default function InventarioPage() {
     }
   };
 
-  // ✅ FILTRO COMBINADO
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
       search.trim() === "" ||
@@ -235,16 +215,17 @@ export default function InventarioPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+    <div className="min-h-screen bg-[#faf9ff] px-6 py-12">
+      <div className="max-w-7xl mx-auto space-y-14">
 
-        <h1 className="text-3xl sm:text-4xl font-bold text-black">
-          📦 Inventario
+        <h1 className="text-3xl font-bold text-neutral-900">
+          Inventario
         </h1>
 
+        {/* FORMULARIO */}
         <form
           onSubmit={handleSubmit}
-          className="bg-white p-6 sm:p-10 rounded-2xl shadow-sm space-y-6"
+          className="bg-white border border-neutral-200 rounded-3xl p-10 space-y-8"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <input
@@ -252,7 +233,7 @@ export default function InventarioPage() {
               placeholder="Nombre del producto"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="border px-4 py-3 rounded-xl text-black w-full"
+              className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full focus:outline-none focus:ring-2 focus:ring-[#d6a8ff]"
             />
 
             <input
@@ -260,14 +241,14 @@ export default function InventarioPage() {
               placeholder="Precio"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              className="border px-4 py-3 rounded-xl text-black w-full"
+              className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full focus:outline-none focus:ring-2 focus:ring-[#d6a8ff]"
             />
           </div>
 
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="border px-4 py-3 rounded-xl text-black w-full"
+            className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full focus:outline-none focus:ring-2 focus:ring-[#d6a8ff]"
           >
             <option value="">Seleccionar categoría</option>
             {categories.map((cat, i) => (
@@ -281,17 +262,19 @@ export default function InventarioPage() {
             placeholder="Descripción"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="border px-4 py-3 rounded-xl text-black w-full"
+            className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full focus:outline-none focus:ring-2 focus:ring-[#d6a8ff]"
           />
 
-          <h2 className="text-lg font-semibold">Variantes</h2>
+          <h2 className="text-lg font-semibold text-neutral-900">
+            Variantes
+          </h2>
 
           {variants.map((variant, index) => (
-            <div key={index} className="bg-gray-50 p-5 rounded-xl border relative">
+            <div key={index} className="bg-neutral-50 border border-neutral-200 p-6 rounded-2xl relative space-y-4">
               <button
                 type="button"
                 onClick={() => removeVariant(index)}
-                className="absolute top-3 right-3 text-red-500 font-bold"
+                className="absolute top-4 right-5 text-neutral-400 hover:text-neutral-900"
               >
                 ✕
               </button>
@@ -304,7 +287,7 @@ export default function InventarioPage() {
                   onChange={(e) =>
                     updateVariant(index, "model_name", e.target.value)
                   }
-                  className="border px-4 py-2 rounded-xl text-black"
+                  className="border border-neutral-300 px-4 py-2 rounded-xl text-neutral-900"
                 />
 
                 <input
@@ -314,14 +297,14 @@ export default function InventarioPage() {
                   onChange={(e) =>
                     updateVariant(index, "stock", e.target.value)
                   }
-                  className="border px-4 py-2 rounded-xl text-black"
+                  className="border border-neutral-300 px-4 py-2 rounded-xl text-neutral-900"
                 />
               </div>
 
               {variant.existingImageUrl && (
                 <img
                   src={variant.existingImageUrl}
-                  className="mt-3 w-20 h-20 object-cover rounded"
+                  className="w-20 h-20 object-cover rounded-xl border border-neutral-200"
                 />
               )}
 
@@ -334,7 +317,7 @@ export default function InventarioPage() {
                     e.target.files?.[0] || null
                   )
                 }
-                className="mt-3"
+                className="text-sm"
               />
             </div>
           ))}
@@ -342,7 +325,7 @@ export default function InventarioPage() {
           <button
             type="button"
             onClick={addVariant}
-            className="text-pink-600 font-semibold"
+            className="text-[#d6a8ff] font-semibold"
           >
             + Agregar variante
           </button>
@@ -350,7 +333,7 @@ export default function InventarioPage() {
           <button
             type="submit"
             disabled={loading}
-            className="bg-pink-500 text-white px-6 py-3 rounded-xl w-full"
+            className="bg-[#d6a8ff] text-black px-6 py-4 rounded-2xl w-full font-semibold hover:opacity-90 transition"
           >
             {loading
               ? "Guardando..."
@@ -360,20 +343,20 @@ export default function InventarioPage() {
           </button>
         </form>
 
-        {/* 🔎 BUSCADOR Y FILTRO */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row gap-4">
+        {/* FILTROS */}
+        <div className="bg-white border border-neutral-200 p-6 rounded-3xl flex flex-col sm:flex-row gap-4">
           <input
             type="text"
             placeholder="Buscar producto..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="border px-4 py-3 rounded-xl text-black w-full"
+            className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full focus:ring-2 focus:ring-[#d6a8ff]"
           />
 
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="border px-4 py-3 rounded-xl text-black w-full sm:w-60"
+            className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full sm:w-60 focus:ring-2 focus:ring-[#d6a8ff]"
           >
             <option value="">Todas las categorías</option>
             {categories.map((cat, i) => (
@@ -384,33 +367,33 @@ export default function InventarioPage() {
           </select>
         </div>
 
-        {/* LISTA PRODUCTOS */}
+        {/* LISTA */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((product) => (
-            <div key={product.id} className="bg-white p-6 rounded-xl shadow-sm">
-              <h3 className="font-semibold text-black text-lg">
+            <div key={product.id} className="bg-white border border-neutral-200 p-6 rounded-2xl">
+              <h3 className="font-semibold text-neutral-900 text-lg">
                 {product.name}
               </h3>
 
-              <p className="text-gray-600 text-sm mt-1">
+              <p className="text-neutral-500 text-sm mt-1">
                 {product.category || "Sin categoría"}
               </p>
 
-              <p className="text-pink-600 font-bold mt-2">
+              <p className="text-neutral-900 font-bold mt-2">
                 ${product.price} MXN
               </p>
 
-              <div className="flex gap-3 mt-4">
+              <div className="flex gap-3 mt-5">
                 <button
                   onClick={() => handleEdit(product)}
-                  className="bg-blue-500 text-white px-4 py-2 rounded-lg w-full"
+                  className="bg-neutral-900 text-white px-4 py-2 rounded-2xl w-full hover:opacity-90 transition"
                 >
                   Modificar
                 </button>
 
                 <button
                   onClick={() => handleDelete(product.id)}
-                  className="bg-red-500 text-white px-4 py-2 rounded-lg w-full"
+                  className="bg-neutral-200 text-neutral-800 px-4 py-2 rounded-2xl w-full hover:bg-neutral-300 transition"
                 >
                   Eliminar
                 </button>

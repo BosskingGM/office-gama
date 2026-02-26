@@ -1,15 +1,16 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 
 type CartItem = {
-  product_id: string;     // 👈 AGREGA ESTO
+  product_id: string;
   variant_id: string;
   name: string;
   model_name: string;
   price: number;
   quantity: number;
   stock: number;
+  image_url?: string;
 };
 
 type CartContextType = {
@@ -26,13 +27,25 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
 
+  // 🔥 Cargar carrito al iniciar
+  useEffect(() => {
+    const storedCart = localStorage.getItem("officegama_cart");
+    if (storedCart) {
+      setCart(JSON.parse(storedCart));
+    }
+  }, []);
+
+  // 🔥 Guardar carrito cuando cambie
+  useEffect(() => {
+    localStorage.setItem("officegama_cart", JSON.stringify(cart));
+  }, [cart]);
+
   const addToCart = (item: CartItem) => {
     setCart((prev) => {
       const existing = prev.find((p) => p.variant_id === item.variant_id);
 
       if (existing) {
         if (existing.quantity + item.quantity > existing.stock) {
-          alert("No hay suficiente stock disponible");
           return prev;
         }
 
@@ -52,7 +65,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       prev.map((item) => {
         if (item.variant_id === variant_id) {
           if (item.quantity >= item.stock) {
-            alert("Stock máximo alcanzado");
             return item;
           }
           return { ...item, quantity: item.quantity + 1 };
@@ -82,6 +94,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = () => {
     setCart([]);
+    localStorage.removeItem("officegama_cart");
   };
 
   return (

@@ -107,116 +107,126 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-10 py-6 bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen">
-      <h1 className="text-2xl sm:text-3xl font-bold text-black mb-6 sm:mb-8">
-        📊 Dashboard Empresarial
-      </h1>
+    <div className="min-h-screen bg-[#faf9ff] px-6 py-12">
+      <div className="max-w-7xl mx-auto space-y-12">
 
-      {/* TARJETAS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-10">
-        <Card
-          title="Ventas Totales"
-          value={`$${stats.totalVentas} MXN`}
-          color="bg-green-600"
-        />
-        <Card
-          title="Pedidos Totales"
-          value={stats.totalPedidos}
-          color="bg-blue-600"
-        />
-        <Card
-          title="Pedidos Enviados"
-          value={stats.enviados}
-          color="bg-purple-600"
-        />
-        <Card
-          title="Ventas del Mes"
-          value={`$${stats.ventasMes} MXN`}
-          color="bg-orange-600"
-        />
-      </div>
+        <h1 className="text-4xl font-bold text-neutral-900">
+          Dashboard
+        </h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+        {/* MÉTRICAS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
 
-        {/* TOP PRODUCTOS */}
-        <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl shadow-xl">
-          <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-black">
-            🏆 Top Productos Más Vendidos
-          </h2>
+          <MetricCard
+            title="Ventas Totales"
+            value={`$${stats.totalVentas} MXN`}
+          />
 
-          <div className="space-y-3 sm:space-y-4">
-            {topProducts.map((p, i) => (
-              <div
-                key={i}
-                className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 bg-gray-100 p-3 sm:p-4 rounded-xl"
-              >
-                <p className="text-black font-medium break-words">
-                  {p.name}
-                </p>
-                <p className="text-black font-bold">
-                  {p.qty} vendidos
-                </p>
-              </div>
-            ))}
-          </div>
+          <MetricCard
+            title="Pedidos Totales"
+            value={stats.totalPedidos}
+          />
+
+          <MetricCard
+            title="Pedidos Enviados"
+            value={stats.enviados}
+          />
+
+          <MetricCard
+            title="Ventas del Mes"
+            value={`$${stats.ventasMes} MXN`}
+            highlight
+          />
+
         </div>
 
-        {/* POCO STOCK */}
-        <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl shadow-xl">
-          <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-black">
-            🚨 Productos con Poco Stock
-          </h2>
+        {/* SECCIONES */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
 
-          {lowStock.length === 0 ? (
-            <p className="text-green-600 font-medium">
-              Todo el stock está saludable
-            </p>
-          ) : (
-            <div className="space-y-3 sm:space-y-4">
-              {lowStock.map((p, i) => (
+          {/* TOP PRODUCTOS */}
+          <div className="bg-white border border-neutral-200 rounded-3xl p-8 space-y-6">
+            <h2 className="text-xl font-semibold text-neutral-900">
+              Top productos
+            </h2>
+
+            <div className="space-y-4">
+              {topProducts.map((p, i) => (
                 <div
                   key={i}
-                  className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 bg-red-100 p-3 sm:p-4 rounded-xl"
+                  className="flex justify-between items-center border border-neutral-200 rounded-2xl px-5 py-4"
                 >
-                  <div>
-                    <p className="text-black font-medium break-words">
-                      {p.name}
-                    </p>
-                    <p className="text-sm text-black">
-                      Modelo: {p.model}
-                    </p>
-                  </div>
-                  <p className="text-red-600 font-bold">
-                    Stock: {p.stock}
+                  <p className="text-neutral-800 font-medium">
+                    {p.name}
+                  </p>
+                  <p className="font-semibold text-neutral-900">
+                    {p.qty} vendidos
                   </p>
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </div>
 
+          {/* STOCK BAJO */}
+          <div className="bg-white border border-neutral-200 rounded-3xl p-8 space-y-6">
+            <h2 className="text-xl font-semibold text-neutral-900">
+              Stock bajo
+            </h2>
+
+            {lowStock.length === 0 ? (
+              <p className="text-neutral-600">
+                Todo el inventario está saludable.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {lowStock.map((p, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between items-center border border-neutral-200 rounded-2xl px-5 py-4"
+                  >
+                    <div>
+                      <p className="text-neutral-900 font-medium">
+                        {p.name}
+                      </p>
+                      <p className="text-sm text-neutral-500">
+                        Modelo: {p.model}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-neutral-900">
+                      {p.stock}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
       </div>
     </div>
   );
 }
 
-function Card({
+function MetricCard({
   title,
   value,
-  color,
+  highlight,
 }: {
   title: string;
   value: any;
-  color: string;
+  highlight?: boolean;
 }) {
   return (
     <div
-      className={`${color} text-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-lg`}
+      className={`rounded-3xl p-6 border transition ${
+        highlight
+          ? "bg-[#d6a8ff] text-black border-[#d6a8ff]"
+          : "bg-white text-neutral-900 border-neutral-200"
+      }`}
     >
-      <p className="text-xs sm:text-sm opacity-80">
+      <p className="text-sm text-neutral-500">
         {title}
       </p>
-      <p className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2 break-words">
+      <p className="text-2xl font-bold mt-2">
         {value}
       </p>
     </div>

@@ -40,72 +40,93 @@ export default function PedidoPage() {
 
   if (!order) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-black">
+      <div className="min-h-screen flex items-center justify-center bg-[#faf9ff] text-neutral-700">
         Cargando pedido...
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 sm:px-6 lg:px-10 py-6">
-      <div className="max-w-3xl mx-auto bg-white p-5 sm:p-6 lg:p-8 rounded-2xl shadow">
-        
-        <h1 className="text-2xl sm:text-3xl font-bold text-green-600 mb-4">
-          🎉 Pedido confirmado
-        </h1>
+    <main className="min-h-screen bg-[#faf9ff] px-6 py-12">
+      <div className="max-w-3xl mx-auto bg-white border border-neutral-200 p-10 rounded-3xl space-y-10">
 
-        <p className="text-black font-semibold mb-2">
-          Número de pedido:
-        </p>
+        {/* HEADER */}
+        <div className="space-y-3">
+          <h1 className="text-3xl font-bold text-neutral-900">
+            Pedido confirmado
+          </h1>
 
-        <p className="text-pink-600 font-bold mb-6 break-all">
-          {order.id}
-        </p>
+          <p className="text-neutral-500 text-sm">
+            Gracias por tu compra. Aquí están los detalles de tu pedido.
+          </p>
+        </div>
 
-        <p className="text-black mb-4">
-          Estado:
-          <span className="ml-2 font-semibold text-yellow-600 break-words">
-            {order.status}
-          </span>
-        </p>
+        {/* INFO PEDIDO */}
+        <div className="border border-neutral-200 rounded-2xl p-6 space-y-3">
+          <div>
+            <p className="text-sm text-neutral-500">
+              Número de pedido
+            </p>
+            <p className="font-semibold text-neutral-900 break-all">
+              {order.id}
+            </p>
+          </div>
 
-        <h2 className="text-lg sm:text-xl font-bold text-black mb-4">
-          Productos:
-        </h2>
+          <div>
+            <p className="text-sm text-neutral-500">
+              Estado
+            </p>
+            <span className="inline-block mt-1 px-4 py-1 rounded-full text-xs font-medium bg-[#d6a8ff] text-black">
+              {order.status}
+            </span>
+          </div>
+        </div>
 
-        <div className="space-y-3 mb-6">
+        {/* PRODUCTOS */}
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-neutral-900">
+            Productos
+          </h2>
+
           {order.order_items.map((item: any) => (
             <div
               key={item.id}
-              className="bg-gray-100 p-3 sm:p-4 rounded-lg"
+              className="border border-neutral-200 rounded-2xl p-6 space-y-1"
             >
-              <p className="text-black font-semibold break-words">
+              <p className="font-medium text-neutral-900 break-words">
                 {item.products?.name}
               </p>
-              <p className="text-black">
+
+              <p className="text-sm text-neutral-500">
                 Modelo: {item.product_variants?.model_name}
               </p>
-              <p className="text-black">
+
+              <p className="text-sm text-neutral-500">
                 Cantidad: {item.quantity}
               </p>
-              <p className="text-pink-600 font-bold">
+
+              <p className="font-semibold text-neutral-900 mt-2">
                 ${item.price} MXN
               </p>
             </div>
           ))}
         </div>
 
-        <h2 className="text-xl sm:text-2xl font-bold text-black">
-          Total:
-          <span className="text-pink-600 ml-2 break-words">
+        {/* TOTAL */}
+        <div className="border-t pt-6 flex justify-between items-center">
+          <span className="text-lg font-semibold text-neutral-900">
+            Total
+          </span>
+          <span className="text-xl font-bold text-neutral-900">
             ${order.total} MXN
           </span>
-        </h2>
+        </div>
 
-        <div className="mt-6 sm:mt-8">
+        {/* BOTÓN */}
+        <div className="pt-6">
           <Link
             href="/cuenta"
-            className="bg-pink-500 text-white px-6 py-3 rounded-full hover:bg-pink-600 transition block w-full sm:w-auto text-center"
+            className="block w-full sm:w-auto text-center bg-[#d6a8ff] text-black px-6 py-4 rounded-2xl font-semibold hover:opacity-90 transition"
           >
             Ver todos mis pedidos
           </Link>
