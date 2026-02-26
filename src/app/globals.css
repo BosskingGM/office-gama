@@ -5,27 +5,22 @@
 ========================= */
 
 :root {
-  /* Fondo */
   --background: #ffffff;
   --background-soft: #faf9ff;
 
-  /* Texto */
   --foreground: #111111;
-  --text-secondary: #4b5563; /* gris medio visible */
+  --text-secondary: #4b5563;
   --text-muted: #6b7280;
 
-  /* Color principal de marca */
   --primary: #d6a8ff;
   --primary-hover: #c084fc;
   --primary-soft: #f3e8ff;
 
-  /* Bordes */
   --border-soft: #e5e7eb;
 }
 
 /* =========================
    🌙 MODO OSCURO DESACTIVADO
-   (minimalista claro premium)
 ========================= */
 
 @media (prefers-color-scheme: dark) {
@@ -45,6 +40,15 @@ body {
   font-family: var(--font-sans, Arial, Helvetica, sans-serif);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* =========================
+   🎒 TEXTURA ESCOLAR PREMIUM
+========================= */
+
+.school-pattern {
+  background-color: var(--background-soft);
+  background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 150 L80 50 L100 60 L40 160 Z' fill='%23d6a8ff' opacity='0.05'/%3E%3C/svg%3E");
 }
 
 /* =========================
@@ -109,11 +113,12 @@ body {
   background: #ffffff;
   border: 1px solid var(--border-soft);
   border-radius: 1rem;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
 }
 
 .card:hover {
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
 }
 
 /* =========================

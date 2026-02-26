@@ -9,9 +9,26 @@ export default function Navbar() {
   const [user, setUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [open, setOpen] = useState(false);
+  const [hideLogo, setHideLogo] = useState(false);
   const { cart } = useCart();
 
   useEffect(() => {
+    // 🔥 Ocultar logo si animación está corriendo
+    if (typeof window !== "undefined") {
+      const playing = sessionStorage.getItem("homeIntroPlaying");
+      if (playing) {
+        setHideLogo(true);
+
+        const check = setInterval(() => {
+          const stillPlaying = sessionStorage.getItem("homeIntroPlaying");
+          if (!stillPlaying) {
+            setHideLogo(false);
+            clearInterval(check);
+          }
+        }, 100);
+      }
+    }
+
     const loadUser = async () => {
       const {
         data: { user },
@@ -60,11 +77,13 @@ export default function Navbar() {
 
             {/* LOGO */}
             <Link href="/" className="flex items-center">
-              <img
-                src="/logo2.png"
-                alt="Office Gama"
-                className="h-12 sm:h-14 w-auto object-contain transition duration-200 hover:scale-[1.03]"
-              />
+              {!hideLogo && (
+                <img
+                  src="/logo2.png"
+                  alt="Office Gama"
+                  className="h-12 sm:h-14 w-auto object-contain transition duration-200 hover:scale-[1.03]"
+                />
+              )}
             </Link>
 
             {/* DESKTOP */}
@@ -136,17 +155,15 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* MOBILE DRAWER OVERLAY */}
+      {/* MOBILE DRAWER */}
       {open && (
         <div className="fixed inset-0 z-[999] md:hidden">
 
-          {/* BACKDROP */}
           <div
             className="absolute inset-0 bg-black/30"
             onClick={() => setOpen(false)}
           />
 
-          {/* DRAWER */}
           <div className="absolute right-0 top-0 h-full w-72 bg-white shadow-2xl p-6 space-y-6">
 
             <div className="flex justify-between items-center">
