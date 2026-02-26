@@ -61,7 +61,7 @@ export default function Navbar() {
             {/* LOGO */}
             <Link href="/" className="flex items-center">
               <img
-                src="/logo.png"
+                src="/logo2.png"
                 alt="Office Gama"
                 className="h-12 sm:h-14 w-auto object-contain transition duration-200 hover:scale-[1.03]"
               />
