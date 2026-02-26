@@ -17,8 +17,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Office GaMa",
+  title: {
+    default: "Office GaMa",
+    template: "%s | Office GaMa",
+  },
   description: "Tienda online de papelería importada en México",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
@@ -30,10 +38,10 @@ export default function RootLayout({
     <html lang="es">
       <body
         className={`
-          ${geistSans.variable} 
-          ${geistMono.variable} 
-          bg-gray-50 
-          min-h-screen 
+          ${geistSans.variable}
+          ${geistMono.variable}
+          bg-gray-50
+          min-h-screen
           text-black
           flex flex-col
         `}

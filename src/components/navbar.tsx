@@ -54,9 +54,15 @@ export default function Navbar() {
   return (
     <nav className="w-full bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <Link href="/" className="text-xl sm:text-2xl font-bold text-pink-500">
-            Office GaMa
+        <div className="flex justify-between items-center h-20">
+
+          {/* 🔥 LOGO MÁS GRANDE */}
+          <Link href="/" className="flex items-center">
+            <img
+              src="/logo.png"
+              alt="Office GaMa"
+              className="h-12 sm:h-14 w-auto object-contain transition hover:scale-105"
+            />
           </Link>
 
           {/* Desktop */}
@@ -90,7 +96,6 @@ export default function Navbar() {
             {user ? (
               <>
                 <span className="text-sm text-black">{user.email}</span>
-
                 <button
                   onClick={handleLogout}
                   className="text-red-500 hover:opacity-80 transition"
@@ -126,21 +131,17 @@ export default function Navbar() {
           open ? "visible opacity-100" : "invisible opacity-0"
         }`}
       >
-        {/* Overlay */}
         <div
           className="absolute inset-0 bg-black/30 backdrop-blur-sm"
           onClick={() => setOpen(false)}
         />
 
-        {/* Panel */}
         <div
           className={`absolute right-0 top-0 h-full w-72 bg-white shadow-xl transform transition-transform duration-300 ${
             open ? "translate-x-0" : "translate-x-full"
           }`}
         >
           <div className="p-6 space-y-6">
-
-            {/* Header */}
             <div className="flex justify-between items-center">
               <span className="text-lg font-semibold text-pink-500">
                 Menú
@@ -155,18 +156,14 @@ export default function Navbar() {
 
             <div className="border-t" />
 
-            {/* Links */}
             <div className="space-y-4 text-black font-medium">
-
-              <Link href="/" onClick={() => setOpen(false)} className="block hover:text-pink-500 transition">
+              <Link href="/" onClick={() => setOpen(false)} className="block">
                 Inicio
               </Link>
-
-              <Link href="/carrito" onClick={() => setOpen(false)} className="block hover:text-pink-500 transition">
+              <Link href="/carrito" onClick={() => setOpen(false)} className="block">
                 Carrito ({cart.length})
               </Link>
-
-              <Link href="/cuenta" onClick={() => setOpen(false)} className="block hover:text-pink-500 transition">
+              <Link href="/cuenta" onClick={() => setOpen(false)} className="block">
                 Mi cuenta
               </Link>
 
@@ -182,36 +179,32 @@ export default function Navbar() {
             </div>
 
             <div className="border-t pt-4 space-y-3">
-
               {user ? (
                 <>
                   <span className="block text-xs text-gray-500 break-all">
                     {user.email}
                   </span>
-
                   <button
                     onClick={() => {
                       handleLogout();
                       setOpen(false);
                     }}
-                    className="text-sm text-gray-500 hover:text-red-500 transition"
+                    className="text-sm text-gray-500 hover:text-red-500"
                   >
                     Cerrar sesión
                   </button>
                 </>
               ) : (
                 <>
-                  <Link href="/login" onClick={() => setOpen(false)} className="block hover:text-pink-500 transition">
+                  <Link href="/login" onClick={() => setOpen(false)} className="block">
                     Login
                   </Link>
-                  <Link href="/registro" onClick={() => setOpen(false)} className="block hover:text-pink-500 transition">
+                  <Link href="/registro" onClick={() => setOpen(false)} className="block">
                     Registro
                   </Link>
                 </>
               )}
-
             </div>
-
           </div>
         </div>
       </div>
