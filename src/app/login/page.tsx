@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -29,27 +30,34 @@ export default function LoginPage() {
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
       showMessage("Correo o contraseña incorrectos", "error");
-    } else {
-      showMessage("Sesión iniciada correctamente ✨", "success");
-
-      setTimeout(() => {
-        router.push("/");
-        router.refresh();
-      }, 1000);
+      return;
     }
+
+    // 🔥 BLOQUEO SI NO CONFIRMÓ CORREO
+    if (!data.user?.email_confirmed_at) {
+      await supabase.auth.signOut();
+      showMessage("Debes confirmar tu correo antes de iniciar sesión 📩", "error");
+      return;
+    }
+
+    showMessage("Sesión iniciada correctamente ✨", "success");
+
+    setTimeout(() => {
+      router.push("/");
+      router.refresh();
+    }, 1000);
   };
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 relative">
 
-      {/* Toast elegante */}
       {message && (
         <div
           className={`fixed top-6 right-6 px-6 py-3 rounded-xl shadow-lg text-white text-sm font-medium transition-all duration-300 ${
@@ -73,7 +81,6 @@ export default function LoginPage() {
           className="w-full border border-gray-300 p-2 sm:p-3 mb-4 rounded text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-400"
         />
 
-        {/* Campo contraseña con botón */}
         <div className="relative mb-6">
           <input
             type={showPassword ? "text" : "password"}
@@ -98,6 +105,17 @@ export default function LoginPage() {
         >
           Entrar
         </button>
+
+        <div className="mt-6 text-center text-sm text-gray-600">
+          ¿No tienes una cuenta?{" "}
+          <Link
+            href="/registro"
+            className="text-pink-500 font-semibold hover:underline transition"
+          >
+            Crear una
+          </Link>
+        </div>
+
       </div>
     </main>
   );
