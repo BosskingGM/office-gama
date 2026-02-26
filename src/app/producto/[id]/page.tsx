@@ -18,6 +18,7 @@ export default function ProductPage() {
   const [selectedVariant, setSelectedVariant] =
     useState<any>(null);
   const [quantity, setQuantity] = useState(1);
+  const [added, setAdded] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,22 +43,29 @@ export default function ProductPage() {
 
   if (!product || !selectedVariant) return null;
 
- const handleAddToCart = () => {
-  addToCart({
-    product_id: product.id,
-    variant_id: selectedVariant.id,
-    name: product.name,
-    model_name: selectedVariant.model_name,
-    price: product.price,
-    quantity: quantity,
-    stock: selectedVariant.stock,
-  });
-};
+  const handleAddToCart = () => {
+    addToCart({
+      product_id: product.id,
+      variant_id: selectedVariant.id,
+      name: product.name,
+      model_name: selectedVariant.model_name,
+      price: product.price,
+      quantity: quantity,
+      stock: selectedVariant.stock,
+    });
+
+    setAdded(true);
+    setQuantity(1);
+
+    setTimeout(() => {
+      setAdded(false);
+    }, 2000);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-10">
       <div className="bg-white rounded-2xl shadow-xl p-10 max-w-5xl mx-auto grid md:grid-cols-2 gap-10">
-        
+
         <img
           src={selectedVariant.image_url}
           className="rounded-xl w-full object-cover"
@@ -77,10 +85,10 @@ export default function ProductPage() {
               <button
                 key={variant.id}
                 onClick={() => setSelectedVariant(variant)}
-                className={`px-4 py-2 rounded-lg border ${
+                className={`px-4 py-2 rounded-lg border transition ${
                   selectedVariant.id === variant.id
                     ? "bg-pink-500 text-white"
-                    : "bg-white text-black"
+                    : "bg-white text-black hover:bg-pink-100"
                 }`}
               >
                 {variant.model_name}
@@ -89,37 +97,43 @@ export default function ProductPage() {
           </div>
 
           <div className="flex items-center gap-4">
-  <button
-    onClick={() =>
-      setQuantity((prev) => (prev > 1 ? prev - 1 : 1))
-    }
-    className="bg-pink-100 text-pink-600 hover:bg-pink-500 hover:text-white transition px-4 py-2 rounded-lg font-bold"
-  >
-    −
-  </button>
+            <button
+              onClick={() =>
+                setQuantity((prev) => (prev > 1 ? prev - 1 : 1))
+              }
+              className="bg-pink-100 text-pink-600 hover:bg-pink-500 hover:text-white transition px-4 py-2 rounded-lg font-bold"
+            >
+              −
+            </button>
 
-  <span className="text-xl font-semibold text-black">
-    {quantity}
-  </span>
+            <span className="text-xl font-semibold text-black">
+              {quantity}
+            </span>
 
-  <button
-    onClick={() =>
-      setQuantity((prev) =>
-        prev < selectedVariant.stock ? prev + 1 : prev
-      )
-    }
-    className="bg-pink-100 text-pink-600 hover:bg-pink-500 hover:text-white transition px-4 py-2 rounded-lg font-bold"
-  >
-    +
-  </button>
-</div>
+            <button
+              onClick={() =>
+                setQuantity((prev) =>
+                  prev < selectedVariant.stock ? prev + 1 : prev
+                )
+              }
+              className="bg-pink-100 text-pink-600 hover:bg-pink-500 hover:text-white transition px-4 py-2 rounded-lg font-bold"
+            >
+              +
+            </button>
+          </div>
 
           <button
             onClick={handleAddToCart}
-            className="bg-pink-500 text-white px-6 py-3 rounded-xl w-full"
+            disabled={added}
+            className={`px-6 py-3 rounded-xl w-full font-semibold transition ${
+              added
+                ? "bg-green-500 text-white"
+                : "bg-pink-500 hover:bg-pink-600 text-white"
+            }`}
           >
-            Agregar al carrito
+            {added ? "✔ Agregado al carrito" : "Agregar al carrito"}
           </button>
+
         </div>
       </div>
     </div>

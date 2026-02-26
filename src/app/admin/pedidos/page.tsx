@@ -145,7 +145,28 @@ export default function AdminPedidos() {
               Total: <strong>${selectedOrder.total} MXN</strong>
             </p>
 
-            <div className="space-y-3">
+            {/* Información del cliente */}
+            <div className="mt-4 p-4 border rounded-xl bg-gray-50 space-y-2 text-sm">
+              <h3 className="font-bold text-black">Información del cliente</h3>
+
+              <p><strong>Nombre:</strong> {selectedOrder.full_name}</p>
+              <p><strong>Email:</strong> {selectedOrder.user_email}</p>
+              <p><strong>Teléfono:</strong> {selectedOrder.phone}</p>
+            </div>
+
+            {/* Dirección */}
+            <div className="mt-4 p-4 border rounded-xl bg-gray-50 space-y-2 text-sm">
+              <h3 className="font-bold text-black">Dirección de envío</h3>
+
+              <p><strong>Dirección:</strong> {selectedOrder.address}</p>
+              <p><strong>Ciudad:</strong> {selectedOrder.city}</p>
+              <p><strong>Código Postal:</strong> {selectedOrder.postal_code}</p>
+              <p><strong>Tipo de envío:</strong> {selectedOrder.shipping_type}</p>
+              <p><strong>Costo envío:</strong> ${selectedOrder.shipping_cost} MXN</p>
+            </div>
+
+            {/* Productos */}
+            <div className="space-y-3 mt-4">
               {selectedOrder.order_items.map((item: any) => (
                 <div
                   key={item.id}
@@ -178,6 +199,7 @@ export default function AdminPedidos() {
               ))}
             </div>
 
+            {/* Botones de estado */}
             <div className="flex flex-col sm:flex-row gap-2 mt-6">
               <button
                 disabled={loading}
