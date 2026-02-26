@@ -1,6 +1,7 @@
 import { CartProvider } from "@/context/CartContext";
 import Navbar from "@/components/navbar";
 import AuthListener from "@/components/AuthListener";
+import Footer from "@/components/Footer";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -34,6 +35,7 @@ export default function RootLayout({
           bg-gray-50 
           min-h-screen 
           text-black
+          flex flex-col
         `}
       >
         <CartProvider>
@@ -42,10 +44,12 @@ export default function RootLayout({
 
           <Navbar />
 
-          {/* Contenedor Global Responsive */}
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* Contenedor principal */}
+          <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
             {children}
           </main>
+
+          <Footer />
 
         </CartProvider>
       </body>

@@ -10,9 +10,35 @@ export default function InventarioPage() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
 
   const [variants, setVariants] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const categories = [
+    "Sacapuntas",
+    "Libretas",
+    "Washi Tapes",
+    "Stickers",
+    "Tintas",
+    "Sellos",
+    "Post It",
+    "Plumones",
+    "Folders",
+    "Plumas",
+    "Pegamento",
+    "Extras",
+    "Marca Textos",
+    "Cutters",
+    "Lapiceras",
+    "Crayolas",
+    "Lacre",
+    "Gises",
+    "Colores",
+    "Correctores",
+    "Juegos Geométricos",
+    "Liquidación",
+  ];
 
   const fetchProducts = async () => {
     const { data } = await supabase
@@ -32,6 +58,7 @@ export default function InventarioPage() {
     setName("");
     setPrice("");
     setDescription("");
+    setCategory("");
     setVariants([]);
   };
 
@@ -72,6 +99,7 @@ export default function InventarioPage() {
     setName(product.name);
     setPrice(product.price.toString());
     setDescription(product.description);
+    setCategory(product.category || "");
 
     const { data } = await supabase
       .from("product_variants")
@@ -118,6 +146,7 @@ export default function InventarioPage() {
             name,
             price: parseFloat(price),
             description,
+            category,
           })
           .eq("id", editingId);
       } else {
@@ -127,6 +156,7 @@ export default function InventarioPage() {
             name,
             price: parseFloat(price),
             description,
+            category,
           })
           .select()
           .single();
@@ -195,7 +225,6 @@ export default function InventarioPage() {
           📦 Inventario
         </h1>
 
-        {/* FORMULARIO */}
         <form
           onSubmit={handleSubmit}
           className="bg-white p-6 sm:p-10 rounded-2xl shadow-sm space-y-6"
@@ -218,6 +247,20 @@ export default function InventarioPage() {
             />
           </div>
 
+          {/* SELECT CATEGORÍA */}
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="border px-4 py-3 rounded-xl text-black w-full"
+          >
+            <option value="">Seleccionar categoría</option>
+            {categories.map((cat, i) => (
+              <option key={i} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+
           <textarea
             placeholder="Descripción"
             value={description}
@@ -229,7 +272,6 @@ export default function InventarioPage() {
 
           {variants.map((variant, index) => (
             <div key={index} className="bg-gray-50 p-5 rounded-xl border relative">
-
               <button
                 type="button"
                 onClick={() => removeVariant(index)}
@@ -294,7 +336,11 @@ export default function InventarioPage() {
             disabled={loading}
             className="bg-pink-500 text-white px-6 py-3 rounded-xl w-full"
           >
-            {loading ? "Guardando..." : editingId ? "Actualizar Producto" : "Crear Producto"}
+            {loading
+              ? "Guardando..."
+              : editingId
+              ? "Actualizar Producto"
+              : "Crear Producto"}
           </button>
         </form>
 
@@ -306,7 +352,11 @@ export default function InventarioPage() {
                 {product.name}
               </h3>
 
-              <p className="text-pink-600 font-bold mt-1">
+              <p className="text-gray-600 text-sm mt-1">
+                {product.category || "Sin categoría"}
+              </p>
+
+              <p className="text-pink-600 font-bold mt-2">
                 ${product.price} MXN
               </p>
 
