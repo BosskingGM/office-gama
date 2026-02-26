@@ -26,6 +26,18 @@ export default function CarritoPage() {
   const [postalCode, setPostalCode] = useState("");
   const [shippingType, setShippingType] = useState("local");
 
+  const [message, setMessage] = useState("");
+  const [showToast, setShowToast] = useState(false);
+
+  const showMessage = (msg: string) => {
+    setMessage(msg);
+    setShowToast(true);
+
+    setTimeout(() => {
+      setShowToast(false);
+    }, 3000);
+  };
+
   useEffect(() => {
     const getUser = async () => {
       const {
@@ -41,7 +53,14 @@ export default function CarritoPage() {
     0
   );
 
-  const shippingCost = shippingType === "local" ? 50 : 120;
+  // ✅ SOLO MODIFICAMOS ESTA LÍNEA
+  const shippingCost =
+    shippingType === "pickup"
+      ? 0
+      : shippingType === "local"
+      ? 50
+      : 160;
+
   const finalTotal = productsTotal + shippingCost;
 
   const handleCheckout = async () => {
@@ -51,6 +70,7 @@ export default function CarritoPage() {
     }
 
     if (!fullName || !phone || !address || !city || !postalCode) {
+      showMessage("Completa todos los datos de envío");
       return;
     }
 
@@ -106,21 +126,26 @@ export default function CarritoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#faf9ff]">
+    <div className="min-h-screen bg-[#faf9ff] relative">
+
+      {showToast && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-4 rounded-2xl shadow-2xl font-semibold animate-bounce z-50">
+          {message}
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-6 py-12">
 
         <h1 className="text-4xl font-bold text-neutral-900 mb-12">
           Carrito
         </h1>
 
-        {/* PRODUCTOS */}
         <div className="space-y-6">
           {cart.map((item) => (
             <div
               key={item.variant_id}
               className="bg-white border border-neutral-200 rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center gap-6"
             >
-              {/* MINIATURA */}
               <div className="w-24 h-24 rounded-2xl overflow-hidden border border-neutral-200 bg-white shrink-0">
                 <img
                   src={item.image_url || "/placeholder.png"}
@@ -129,7 +154,6 @@ export default function CarritoPage() {
                 />
               </div>
 
-              {/* INFO */}
               <div className="flex-1 space-y-2">
                 <p className="text-lg font-semibold text-neutral-900">
                   {item.name}
@@ -162,7 +186,6 @@ export default function CarritoPage() {
                 </div>
               </div>
 
-              {/* ELIMINAR */}
               <button
                 onClick={() => removeFromCart(item.variant_id)}
                 className="text-sm text-neutral-500 hover:text-red-600 transition"
@@ -173,10 +196,8 @@ export default function CarritoPage() {
           ))}
         </div>
 
-        {/* GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mt-16">
 
-          {/* FORM */}
           <div className="bg-white border border-neutral-200 p-8 rounded-3xl">
             <h2 className="text-2xl font-bold text-neutral-900 mb-8">
               Información de envío
@@ -200,20 +221,21 @@ export default function CarritoPage() {
                 />
               ))}
 
+              {/* ✅ SOLO AGREGAMOS PICKUP */}
               <select
                 value={shippingType}
                 onChange={(e) => setShippingType(e.target.value)}
                 className="w-full border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#d6a8ff] transition"
               >
+                <option value="pickup">Recoger en tienda (Gratis)</option>
                 <option value="local">Entrega local ($50)</option>
                 <option value="paqueteria">
-                  Paquetería nacional ($120)
+                  Paquetería nacional ($160)
                 </option>
               </select>
             </div>
           </div>
 
-          {/* RESUMEN */}
           <div className="bg-white border border-neutral-200 p-8 rounded-3xl h-fit">
             <h2 className="text-2xl font-bold text-neutral-900 mb-8">
               Resumen
