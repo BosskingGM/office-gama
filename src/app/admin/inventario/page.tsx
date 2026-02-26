@@ -15,6 +15,10 @@ export default function InventarioPage() {
   const [variants, setVariants] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // ✅ NUEVOS ESTADOS (NO ROMPEN NADA)
+  const [search, setSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+
   const categories = [
     "Sacapuntas",
     "Libretas",
@@ -217,6 +221,19 @@ export default function InventarioPage() {
     }
   };
 
+  // ✅ FILTRO COMBINADO
+  const filteredProducts = products.filter((product) => {
+    const matchesSearch =
+      search.trim() === "" ||
+      product.name.toLowerCase().includes(search.toLowerCase());
+
+    const matchesCategory =
+      filterCategory === "" ||
+      product.category === filterCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
@@ -247,7 +264,6 @@ export default function InventarioPage() {
             />
           </div>
 
-          {/* SELECT CATEGORÍA */}
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -344,9 +360,33 @@ export default function InventarioPage() {
           </button>
         </form>
 
+        {/* 🔎 BUSCADOR Y FILTRO */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row gap-4">
+          <input
+            type="text"
+            placeholder="Buscar producto..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border px-4 py-3 rounded-xl text-black w-full"
+          />
+
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="border px-4 py-3 rounded-xl text-black w-full sm:w-60"
+          >
+            <option value="">Todas las categorías</option>
+            {categories.map((cat, i) => (
+              <option key={i} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* LISTA PRODUCTOS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <div key={product.id} className="bg-white p-6 rounded-xl shadow-sm">
               <h3 className="font-semibold text-black text-lg">
                 {product.name}

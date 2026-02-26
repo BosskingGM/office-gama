@@ -140,7 +140,7 @@ export default function HomePage() {
       {/* CONTENEDOR PRINCIPAL */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-        {/* 🔍 Buscador (NO MODIFICADO) */}
+        {/* 🔍 Buscador */}
         <div className="mb-8 flex justify-center sm:justify-start">
           <input
             type="text"
@@ -164,14 +164,14 @@ export default function HomePage() {
           />
         </div>
 
-        {/* 🛍 GRID ORIGINAL */}
+        {/* 🛍 GRID ACTUALIZADO */}
         <div className="
           grid 
-          grid-cols-1 
+          grid-cols-2 
           sm:grid-cols-2 
           lg:grid-cols-3 
           xl:grid-cols-4 
-          gap-6
+          gap-4
         ">
           {filteredProducts.map((product) => (
             <ProductCard
