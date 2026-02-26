@@ -12,17 +12,18 @@ export default function Navbar() {
   const { cart } = useCart();
 
   useEffect(() => {
-    const getSessionAndRole = async () => {
-      const { data } = await supabase.auth.getSession();
-      const currentUser = data.session?.user ?? null;
+    const loadUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      setUser(currentUser);
+      setUser(user);
 
-      if (currentUser) {
+      if (user) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("role")
-          .eq("id", currentUser.id)
+          .eq("id", user.id)
           .single();
 
         setIsAdmin(profile?.role === "admin");
@@ -31,25 +32,12 @@ export default function Navbar() {
       }
     };
 
-    getSessionAndRole();
+    loadUser();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-
-      if (currentUser) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", currentUser.id)
-          .single();
-
-        setIsAdmin(profile?.role === "admin");
-      } else {
-        setIsAdmin(false);
-      }
+    } = supabase.auth.onAuthStateChange(() => {
+      loadUser();
     });
 
     return () => {
@@ -59,31 +47,23 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setUser(null);
+    setIsAdmin(false);
   };
 
   return (
     <nav className="w-full bg-white border-b shadow-sm sticky top-0 z-50">
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
         <div className="flex justify-between items-center h-16">
-
-          {/* Logo */}
-          <Link
-            href="/"
-            className="text-xl sm:text-2xl font-bold text-pink-500"
-          >
+          <Link href="/" className="text-xl sm:text-2xl font-bold text-pink-500">
             Office GaMa
           </Link>
 
-          {/* Desktop Menu */}
           <div className="hidden md:flex gap-6 items-center text-black font-medium">
-
             <Link href="/" className="hover:text-pink-500 transition">
               Inicio
             </Link>
 
-            {/* Carrito */}
             <Link href="/carrito" className="relative text-xl">
               🛒
               {cart.length > 0 && (
@@ -108,9 +88,7 @@ export default function Navbar() {
 
             {user ? (
               <>
-                <span className="text-sm text-black">
-                  {user.email}
-                </span>
+                <span className="text-sm text-black">{user.email}</span>
 
                 <button
                   onClick={handleLogout}
@@ -129,24 +107,19 @@ export default function Navbar() {
                 </Link>
               </>
             )}
-
           </div>
 
-          {/* Mobile Button */}
           <button
             onClick={() => setOpen(!open)}
             className="md:hidden text-2xl text-black"
           >
             ☰
           </button>
-
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {open && (
         <div className="md:hidden bg-white border-t px-6 py-6 space-y-4 text-black font-medium">
-
           <Link href="/" onClick={() => setOpen(false)} className="block">
             Inicio
           </Link>
@@ -171,9 +144,7 @@ export default function Navbar() {
 
           {user ? (
             <>
-              <span className="block text-sm">
-                {user.email}
-              </span>
+              <span className="block text-sm">{user.email}</span>
 
               <button
                 onClick={() => {
@@ -195,10 +166,8 @@ export default function Navbar() {
               </Link>
             </>
           )}
-
         </div>
       )}
-
     </nav>
   );
 }
