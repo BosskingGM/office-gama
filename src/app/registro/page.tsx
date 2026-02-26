@@ -24,7 +24,7 @@ export default function RegisterPage() {
       alert(error.message);
     } else {
       alert("Cuenta creada correctamente");
-      router.push("/login");
+      router.push("/");
     }
   };
 
