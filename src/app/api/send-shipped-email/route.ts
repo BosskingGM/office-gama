@@ -2,16 +2,25 @@ import { NextResponse } from "next/server";
 import { sendOrderShippedEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
-  const order = await req.json();
-
-  console.log("📧 Intentando enviar correo a:", order.user_email);
-
   try {
-    await sendOrderShippedEmail(order.user_email, order);
-    console.log("✅ Correo enviado correctamente");
-  } catch (error) {
-    console.error("❌ Error enviando correo:", error);
-  }
+    const { orderId } = await req.json();
 
-  return NextResponse.json({ ok: true });
+    if (!orderId) {
+      return NextResponse.json(
+        { error: "orderId requerido" },
+        { status: 400 }
+      );
+    }
+
+    await sendOrderShippedEmail(orderId);
+
+    return NextResponse.json({ success: true });
+
+  } catch (error) {
+    console.error("Error enviando correo:", error);
+    return NextResponse.json(
+      { error: "Error enviando correo" },
+      { status: 500 }
+    );
+  }
 }

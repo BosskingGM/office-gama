@@ -53,18 +53,17 @@ export default function AdminPedidos() {
       return;
     }
 
-    if (newStatus === "enviado") {
-      await fetch("/api/enviar-correo", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: userEmail,
-          orderId,
-        }),
-      });
-    }
+  if (newStatus === "enviado") {
+  await fetch("/api/send-shipped-email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      orderId: orderId,
+    }),
+  });
+}
 
     await fetchOrders();
     setSelectedOrder(null);

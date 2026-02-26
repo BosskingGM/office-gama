@@ -81,7 +81,7 @@ export default function Navbar() {
             </Link>
 
             <Link href="/cuenta" className="hover:text-pink-500 transition">
-              Mi cuenta
+              Mis pedidos
             </Link>
 
             {isAdmin && (
