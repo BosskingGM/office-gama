@@ -36,25 +36,44 @@ export default function ProductPage() {
 
       setProduct(productData);
       setVariants(variantsData || []);
-      setSelectedVariant(variantsData?.[0]);
+      setSelectedVariant(variantsData?.[0] || null);
+      setQuantity(1);
     };
 
     fetchData();
   }, [id]);
 
+  // 🔥 Ajustar cantidad automáticamente cuando cambia variante
+  useEffect(() => {
+    if (!selectedVariant) return;
+
+    if (selectedVariant.stock === 0) {
+      setQuantity(1);
+      return;
+    }
+
+    if (quantity > selectedVariant.stock) {
+      setQuantity(selectedVariant.stock);
+    }
+  }, [selectedVariant]);
+
   if (!product || !selectedVariant) return null;
 
   const handleAddToCart = () => {
+    if (!selectedVariant) return;
+    if (selectedVariant.stock === 0) return;
+    if (quantity > selectedVariant.stock) return;
+
     addToCart({
-  product_id: product.id,
-  variant_id: selectedVariant.id,
-  name: product.name,
-  model_name: selectedVariant.model_name,
-  price: product.price,
-  quantity: quantity,
-  stock: selectedVariant.stock,
-  image_url: selectedVariant.image_url, 
-});
+      product_id: product.id,
+      variant_id: selectedVariant.id,
+      name: product.name,
+      model_name: selectedVariant.model_name,
+      price: product.price,
+      quantity: quantity,
+      stock: selectedVariant.stock,
+      image_url: selectedVariant.image_url,
+    });
 
     setAdded(true);
     setQuantity(1);
@@ -68,7 +87,6 @@ export default function ProductPage() {
     <div className="min-h-screen bg-[#faf9ff] px-4 py-10">
       <div className="max-w-6xl mx-auto">
 
-        {/* BOTÓN VOLVER */}
         <button
           onClick={() => router.back()}
           className="mb-8 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition flex items-center gap-2"
@@ -77,7 +95,6 @@ export default function ProductPage() {
         </button>
 
         <div className="bg-white rounded-3xl border border-neutral-200 p-6 sm:p-10">
-
           <div className="grid md:grid-cols-2 gap-12 items-start">
 
             {/* IMAGEN */}
@@ -125,7 +142,10 @@ export default function ProductPage() {
                   {variants.map((variant) => (
                     <button
                       key={variant.id}
-                      onClick={() => setSelectedVariant(variant)}
+                      onClick={() => {
+                        setSelectedVariant(variant);
+                        setQuantity(1); // 🔥 reset inmediato
+                      }}
                       className={`px-4 py-2 text-sm rounded-xl border transition ${
                         selectedVariant.id === variant.id
                           ? "bg-[#d6a8ff] text-black border-[#d6a8ff]"
@@ -159,7 +179,8 @@ export default function ProductPage() {
                       prev < selectedVariant.stock ? prev + 1 : prev
                     )
                   }
-                  className="border border-neutral-300 px-4 py-2 rounded-xl text-neutral-800 hover:bg-[#f3e8ff] transition"
+                  disabled={quantity >= selectedVariant.stock}
+                  className="border border-neutral-300 px-4 py-2 rounded-xl text-neutral-800 hover:bg-[#f3e8ff] transition disabled:opacity-40"
                 >
                   +
                 </button>
@@ -168,7 +189,11 @@ export default function ProductPage() {
               {/* BOTÓN AGREGAR */}
               <button
                 onClick={handleAddToCart}
-                disabled={added}
+                disabled={
+                  added ||
+                  selectedVariant.stock === 0 ||
+                  quantity === 0
+                }
                 className={`mt-4 px-6 py-4 rounded-2xl w-full font-semibold transition ${
                   added
                     ? "bg-neutral-900 text-white"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import Image from "next/image";
 
@@ -27,15 +27,48 @@ export default function ProductoClient({
   variants,
 }: Props) {
   const { addToCart } = useCart();
-  const [selectedVariantId, setSelectedVariantId] =
-    useState<string>("");
+
+  const [selectedVariantId, setSelectedVariantId] = useState<string>("");
+  const [quantity, setQuantity] = useState<number>(1);
 
   const selectedVariant = variants.find(
     (v) => v.id === selectedVariantId
   );
 
+  // 🔥 Cuando cambia la variante, SIEMPRE reinicia cantidad
+  useEffect(() => {
+    if (!selectedVariant) {
+      setQuantity(1);
+      return;
+    }
+
+    if (selectedVariant.stock === 0) {
+      setQuantity(0);
+    } else {
+      setQuantity(1); // siempre empezar en 1 al cambiar variante
+    }
+  }, [selectedVariantId]);
+
+  const increaseQuantity = () => {
+    if (!selectedVariant) return;
+
+    setQuantity((prev) => {
+      if (prev >= selectedVariant.stock) return prev;
+      return prev + 1;
+    });
+  };
+
+  const decreaseQuantity = () => {
+    setQuantity((prev) => {
+      if (prev <= 1) return 1;
+      return prev - 1;
+    });
+  };
+
   const handleAddToCart = () => {
     if (!selectedVariant) return;
+    if (selectedVariant.stock === 0) return;
+    if (quantity > selectedVariant.stock) return;
 
     addToCart({
       product_id: product.id,
@@ -43,19 +76,15 @@ export default function ProductoClient({
       name: product.name,
       model_name: selectedVariant.model_name,
       price: product.price,
-      quantity: 1,
+      quantity,
       stock: selectedVariant.stock,
     } as any);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
         <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8">
-
-          {/* Layout Responsive */}
           <div className="flex flex-col lg:flex-row gap-10">
 
             {/* Imagen */}
@@ -81,7 +110,7 @@ export default function ProductoClient({
                 ${product.price} MXN
               </p>
 
-              {/* Selector de variante */}
+              {/* Variantes */}
               <label className="block font-semibold text-black mb-3">
                 Selecciona modelo:
               </label>
@@ -96,8 +125,7 @@ export default function ProductoClient({
                     <button
                       key={variant.id}
                       onClick={() =>
-                        !isOut &&
-                        setSelectedVariantId(variant.id)
+                        !isOut && setSelectedVariantId(variant.id)
                       }
                       disabled={isOut}
                       className={`
@@ -123,9 +151,9 @@ export default function ProductoClient({
                 })}
               </div>
 
-              {/* Mostrar stock */}
+              {/* Stock */}
               {selectedVariant && (
-                <p className="mb-6 font-semibold text-black">
+                <p className="mb-4 font-semibold text-black">
                   Stock disponible:{" "}
                   <span className="text-pink-600">
                     {selectedVariant.stock}
@@ -133,12 +161,39 @@ export default function ProductoClient({
                 </p>
               )}
 
+              {/* Cantidad */}
+              {selectedVariant && selectedVariant.stock > 0 && (
+                <div className="flex items-center gap-4 mb-6">
+                  <button
+                    onClick={decreaseQuantity}
+                    className="w-10 h-10 border rounded-lg"
+                  >
+                    -
+                  </button>
+
+                  <span className="font-semibold text-lg">
+                    {quantity}
+                  </span>
+
+                  <button
+                    onClick={increaseQuantity}
+                    disabled={
+                      quantity >= selectedVariant.stock
+                    }
+                    className="w-10 h-10 border rounded-lg disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
+
               {/* Botón */}
               <button
                 onClick={handleAddToCart}
                 disabled={
                   !selectedVariant ||
-                  selectedVariant.stock === 0
+                  selectedVariant.stock === 0 ||
+                  quantity === 0
                 }
                 className="
                   w-full 
@@ -157,7 +212,6 @@ export default function ProductoClient({
 
             </div>
           </div>
-
         </div>
       </div>
     </div>
