@@ -5,7 +5,6 @@ import { createClient } from "@supabase/supabase-js";
 export const dynamic = "force-dynamic";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
- 
 });
 
 const supabase = createClient(
@@ -30,16 +29,28 @@ export async function POST(req: Request) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err: any) {
-    console.error("❌ Webhook error:", err.message);
+    console.error("❌ Webhook signature error:", err.message);
     return NextResponse.json({ error: "Webhook Error" }, { status: 400 });
   }
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
-    const items = JSON.parse(session.metadata?.items || "[]");
-    const user_id = session.metadata?.user_id || null;
-    const total = session.amount_total! / 100;
+    console.log("🔥 METADATA RECIBIDA:", session.metadata);
+
+    if (!session.metadata) {
+      console.error("❌ Metadata vacía");
+      return NextResponse.json({ error: "Metadata vacía" }, { status: 400 });
+    }
+
+    const items = session.metadata.items
+      ? JSON.parse(session.metadata.items)
+      : [];
+
+    const user_id = session.metadata.user_id || null;
+    const total = session.amount_total
+      ? session.amount_total / 100
+      : 0;
 
     // Evitar duplicados
     const { data: existingOrder } = await supabase
@@ -49,46 +60,54 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (existingOrder) {
+      console.log("⚠️ Orden ya existente");
       return NextResponse.json({ received: true });
     }
 
+    // INSERT PRINCIPAL
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
         stripe_session_id: session.id,
-        user_id,
-        user_email: session.customer_details?.email,
-        total_amount: total,
+        user_id: user_id,
+        user_email: session.customer_details?.email || null,
+        total: total, // 👈 usa EXACTAMENTE el nombre real de tu columna
         status: "pagado",
-
-        full_name: session.metadata?.full_name,
-        phone: session.metadata?.phone,
-        address: session.metadata?.address,
-        city: session.metadata?.city,
-        postal_code: session.metadata?.postal_code,
-
-        shipping_type: session.metadata?.shipping_type,
-        shipping_cost: Number(session.metadata?.shipping_cost || 0),
+        full_name: session.metadata.full_name || null,
+        phone: session.metadata.phone || null,
+        address: session.metadata.address || null,
+        city: session.metadata.city || null,
+        postal_code: session.metadata.postal_code || null,
+        shipping_type: session.metadata.shipping_type || null,
+        shipping_cost: Number(session.metadata.shipping_cost || 0),
       })
       .select()
       .single();
 
     if (orderError) {
-      console.error("❌ Error creando orden:", orderError);
+      console.error("❌ Error insertando orden:", orderError);
       return NextResponse.json(
         { error: "Error guardando orden" },
         { status: 500 }
       );
     }
 
-    // Insertar productos
+    console.log("✅ Orden creada:", order.id);
+
+    // INSERT ITEMS
     for (const item of items) {
-      await supabase.from("order_items").insert({
-        order_id: order.id,
-        variant_id: item.variant_id,
-        quantity: item.quantity,
-        price: item.price,
-      });
+      const { error: itemError } = await supabase
+        .from("order_items")
+        .insert({
+          order_id: order.id,
+          variant_id: item.variant_id,
+          quantity: item.quantity,
+          price: item.price,
+        });
+
+      if (itemError) {
+        console.error("❌ Error insertando item:", itemError);
+      }
 
       // Descontar stock
       await supabase.rpc("decrement_stock", {
@@ -97,7 +116,7 @@ export async function POST(req: Request) {
       });
     }
 
-    console.log("✅ Orden creada:", order.id);
+    console.log("🎉 Items insertados correctamente");
   }
 
   return NextResponse.json({ received: true });

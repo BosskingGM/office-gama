@@ -35,6 +35,19 @@ export default function AdminPedidos() {
     setOrders(data || []);
   };
 
+  // 🔥 FORMATO MÉXICO CORRECTO
+  const formatMXDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString("es-MX", {
+      timeZone: "America/Mexico_City",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
   const handleUpdateStatus = async (
     orderId: string,
     newStatus: string
@@ -100,7 +113,7 @@ export default function AdminPedidos() {
                   Pedido #{order.id.slice(0, 8)}
                 </p>
                 <p className="text-sm text-neutral-500">
-                  {new Date(order.created_at).toLocaleString()}
+                  {formatMXDate(order.created_at)}
                 </p>
               </div>
 
@@ -135,6 +148,10 @@ export default function AdminPedidos() {
               <h2 className="text-2xl font-semibold text-neutral-900">
                 Pedido #{selectedOrder.id.slice(0, 8)}
               </h2>
+
+              <p className="text-sm text-neutral-500">
+                {formatMXDate(selectedOrder.created_at)}
+              </p>
 
               <p className="text-neutral-700">
                 Total: <strong>${selectedOrder.total} MXN</strong>

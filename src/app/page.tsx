@@ -12,12 +12,12 @@ export default function HomePage() {
 
   const PRODUCTS_PER_PAGE = 8;
 
-  const categories = [
-    "Sacapuntas","Libretas","Washi Tapes","Stickers","Tintas","Sellos",
-    "Post It","Plumones","Folders","Plumas","Pegamento","Extras",
-    "Marca Textos","Cutters","Lapiceras","Crayolas","Lacre","Gises",
-    "Colores","Correctores","Juegos Geométricos","Liquidación",
-  ];
+const categories = [
+  "Sacapuntas","Libretas","Washi Tapes","Stickers","Tintas","Sellos","Post It",
+  "Plumones","Folders","Plumas","Pegamento","Extras","Marca Textos","Cutters",
+  "Lapiceras","Crayolas","Lacre","Gises","Colores","Correctores",
+  "Juegos Geométricos","Liquidación",
+].sort((a, b) => a.localeCompare(b, "es"));
 
   useEffect(() => {
     fetchProducts();

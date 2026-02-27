@@ -18,12 +18,12 @@ export default function InventarioPage() {
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
 
-  const categories = [
-    "Sacapuntas","Libretas","Washi Tapes","Stickers","Tintas","Sellos","Post It",
-    "Plumones","Folders","Plumas","Pegamento","Extras","Marca Textos","Cutters",
-    "Lapiceras","Crayolas","Lacre","Gises","Colores","Correctores",
-    "Juegos Geométricos","Liquidación",
-  ];
+const categories = [
+  "Sacapuntas","Libretas","Washi Tapes","Stickers","Tintas","Sellos","Post It",
+  "Plumones","Folders","Plumas","Pegamento","Extras","Marca Textos","Cutters",
+  "Lapiceras","Crayolas","Lacre","Gises","Colores","Correctores",
+  "Juegos Geométricos","Liquidación",
+].sort((a, b) => a.localeCompare(b, "es"));
 
   const fetchProducts = async () => {
     const { data } = await supabase
@@ -215,25 +215,37 @@ export default function InventarioPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#faf9ff] px-6 py-12">
-      <div className="max-w-7xl mx-auto space-y-14">
+    <div className="min-h-screen bg-[#faf9ff] px-4 sm:px-6 py-10">
+      <div className="max-w-6xl mx-auto space-y-12">
 
-        <h1 className="text-3xl font-bold text-neutral-900">
-          Inventario
-        </h1>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900">
+            Inventario
+          </h1>
 
-        {/* FORMULARIO */}
+          {editingId && (
+            <button
+              onClick={resetForm}
+              className="text-sm bg-neutral-900 text-white px-4 py-2 rounded-xl hover:opacity-90"
+            >
+              + Crear nuevo producto
+            </button>
+          )}
+        </div>
+
+        {/* FORM */}
         <form
           onSubmit={handleSubmit}
-          className="bg-white border border-neutral-200 rounded-3xl p-10 space-y-8"
+          className="bg-white border border-neutral-200 rounded-3xl p-6 sm:p-10 space-y-6"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <input
               type="text"
               placeholder="Nombre del producto"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full focus:outline-none focus:ring-2 focus:ring-[#d6a8ff]"
+              className="border border-neutral-300 px-4 py-3 rounded-xl w-full focus:ring-2 focus:ring-[#d6a8ff]"
             />
 
             <input
@@ -241,20 +253,18 @@ export default function InventarioPage() {
               placeholder="Precio"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full focus:outline-none focus:ring-2 focus:ring-[#d6a8ff]"
+              className="border border-neutral-300 px-4 py-3 rounded-xl w-full focus:ring-2 focus:ring-[#d6a8ff]"
             />
           </div>
 
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full focus:outline-none focus:ring-2 focus:ring-[#d6a8ff]"
+            className="border border-neutral-300 px-4 py-3 rounded-xl w-full focus:ring-2 focus:ring-[#d6a8ff]"
           >
             <option value="">Seleccionar categoría</option>
             {categories.map((cat, i) => (
-              <option key={i} value={cat}>
-                {cat}
-              </option>
+              <option key={i} value={cat}>{cat}</option>
             ))}
           </select>
 
@@ -262,7 +272,7 @@ export default function InventarioPage() {
             placeholder="Descripción"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full focus:outline-none focus:ring-2 focus:ring-[#d6a8ff]"
+            className="border border-neutral-300 px-4 py-3 rounded-xl w-full focus:ring-2 focus:ring-[#d6a8ff]"
           />
 
           <h2 className="text-lg font-semibold text-neutral-900">
@@ -270,16 +280,19 @@ export default function InventarioPage() {
           </h2>
 
           {variants.map((variant, index) => (
-            <div key={index} className="bg-neutral-50 border border-neutral-200 p-6 rounded-2xl relative space-y-4">
+            <div
+              key={index}
+              className="bg-neutral-50 border border-neutral-200 p-5 rounded-2xl space-y-4 relative"
+            >
               <button
                 type="button"
                 onClick={() => removeVariant(index)}
-                className="absolute top-4 right-5 text-neutral-400 hover:text-neutral-900"
+                className="absolute top-3 right-4 text-neutral-400 hover:text-black"
               >
                 ✕
               </button>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   type="text"
                   placeholder="Modelo"
@@ -287,7 +300,7 @@ export default function InventarioPage() {
                   onChange={(e) =>
                     updateVariant(index, "model_name", e.target.value)
                   }
-                  className="border border-neutral-300 px-4 py-2 rounded-xl text-neutral-900"
+                  className="border border-neutral-300 px-4 py-2 rounded-xl"
                 />
 
                 <input
@@ -297,35 +310,55 @@ export default function InventarioPage() {
                   onChange={(e) =>
                     updateVariant(index, "stock", e.target.value)
                   }
-                  className="border border-neutral-300 px-4 py-2 rounded-xl text-neutral-900"
+                  className="border border-neutral-300 px-4 py-2 rounded-xl"
                 />
               </div>
 
               {variant.existingImageUrl && (
                 <img
                   src={variant.existingImageUrl}
-                  className="w-20 h-20 object-cover rounded-xl border border-neutral-200"
+                  className="w-24 h-24 object-cover rounded-xl border border-neutral-200"
                 />
               )}
 
-              <input
-                type="file"
-                onChange={(e) =>
-                  updateVariant(
-                    index,
-                    "imageFile",
-                    e.target.files?.[0] || null
-                  )
-                }
-                className="text-sm"
-              />
+              {/* FILE CUSTOM */}
+              <label className="block">
+                <span className="text-sm text-neutral-600">
+                  Imagen del modelo
+                </span>
+                <div className="mt-2 flex items-center gap-4">
+                  <input
+                    type="file"
+                    onChange={(e) =>
+                      updateVariant(
+                        index,
+                        "imageFile",
+                        e.target.files?.[0] || null
+                      )
+                    }
+                    className="hidden"
+                    id={`file-${index}`}
+                  />
+                  <label
+                    htmlFor={`file-${index}`}
+                    className="cursor-pointer bg-neutral-900 text-white px-4 py-2 rounded-xl text-sm hover:opacity-90"
+                  >
+                    Seleccionar imagen
+                  </label>
+                  {variant.imageFile && (
+                    <span className="text-xs text-neutral-500 truncate max-w-[120px]">
+                      {variant.imageFile.name}
+                    </span>
+                  )}
+                </div>
+              </label>
             </div>
           ))}
 
           <button
             type="button"
             onClick={addVariant}
-            className="text-[#d6a8ff] font-semibold"
+            className="text-[#b784f7] font-semibold"
           >
             + Agregar variante
           </button>
@@ -333,7 +366,7 @@ export default function InventarioPage() {
           <button
             type="submit"
             disabled={loading}
-            className="bg-[#d6a8ff] text-black px-6 py-4 rounded-2xl w-full font-semibold hover:opacity-90 transition"
+            className="bg-[#b784f7] text-black px-6 py-4 rounded-2xl w-full font-semibold hover:opacity-90 transition"
           >
             {loading
               ? "Guardando..."
@@ -344,63 +377,66 @@ export default function InventarioPage() {
         </form>
 
         {/* FILTROS */}
-        <div className="bg-white border border-neutral-200 p-6 rounded-3xl flex flex-col sm:flex-row gap-4">
-          <input
-            type="text"
-            placeholder="Buscar producto..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full focus:ring-2 focus:ring-[#d6a8ff]"
-          />
+<div className="bg-white border border-neutral-200 p-6 rounded-3xl flex flex-col sm:flex-row gap-4">
+  <input
+    type="text"
+    placeholder="Buscar producto..."
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full focus:ring-2 focus:ring-[#d6a8ff]"
+  />
 
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full sm:w-60 focus:ring-2 focus:ring-[#d6a8ff]"
-          >
-            <option value="">Todas las categorías</option>
-            {categories.map((cat, i) => (
-              <option key={i} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-        </div>
+  <select
+    value={filterCategory}
+    onChange={(e) => setFilterCategory(e.target.value)}
+    className="border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 w-full sm:w-60 focus:ring-2 focus:ring-[#d6a8ff]"
+  >
+    <option value="">Todas las categorías</option>
+    {categories.map((cat, i) => (
+      <option key={i} value={cat}>
+        {cat}
+      </option>
+    ))}
+  </select>
+</div>
 
-        {/* LISTA */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => (
-            <div key={product.id} className="bg-white border border-neutral-200 p-6 rounded-2xl">
-              <h3 className="font-semibold text-neutral-900 text-lg">
-                {product.name}
-              </h3>
+{/* LISTA */}
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+  {filteredProducts.map((product) => (
+    <div
+      key={product.id}
+      className="bg-white border border-neutral-200 p-6 rounded-2xl shadow-sm hover:shadow-md transition"
+    >
+      <h3 className="font-semibold text-neutral-900 text-lg">
+        {product.name}
+      </h3>
 
-              <p className="text-neutral-500 text-sm mt-1">
-                {product.category || "Sin categoría"}
-              </p>
+      <p className="text-neutral-500 text-sm mt-1">
+        {product.category || "Sin categoría"}
+      </p>
 
-              <p className="text-neutral-900 font-bold mt-2">
-                ${product.price} MXN
-              </p>
+      <p className="text-neutral-900 font-bold mt-2">
+        ${product.price} MXN
+      </p>
 
-              <div className="flex gap-3 mt-5">
-                <button
-                  onClick={() => handleEdit(product)}
-                  className="bg-neutral-900 text-white px-4 py-2 rounded-2xl w-full hover:opacity-90 transition"
-                >
-                  Modificar
-                </button>
+      <div className="flex gap-3 mt-5">
+        <button
+          onClick={() => handleEdit(product)}
+          className="bg-neutral-900 text-white px-4 py-2 rounded-2xl w-full hover:opacity-90 transition"
+        >
+          Modificar
+        </button>
 
-                <button
-                  onClick={() => handleDelete(product.id)}
-                  className="bg-neutral-200 text-neutral-800 px-4 py-2 rounded-2xl w-full hover:bg-neutral-300 transition"
-                >
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <button
+          onClick={() => handleDelete(product.id)}
+          className="bg-neutral-200 text-neutral-800 px-4 py-2 rounded-2xl w-full hover:bg-neutral-300 transition"
+        >
+          Eliminar
+        </button>
+      </div>
+    </div>
+  ))}
+</div>
 
       </div>
     </div>
