@@ -24,7 +24,7 @@ export default function CarritoPage() {
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [postalCode, setPostalCode] = useState("");
-  const [shippingType, setShippingType] = useState("local");
+  const [shippingType, setShippingType] = useState("pickup");
 
   const [message, setMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
@@ -32,10 +32,7 @@ export default function CarritoPage() {
   const showMessage = (msg: string) => {
     setMessage(msg);
     setShowToast(true);
-
-    setTimeout(() => {
-      setShowToast(false);
-    }, 3000);
+    setTimeout(() => setShowToast(false), 3000);
   };
 
   useEffect(() => {
@@ -53,7 +50,6 @@ export default function CarritoPage() {
     0
   );
 
-  // ✅ SOLO MODIFICAMOS ESTA LÍNEA
   const shippingCost =
     shippingType === "pickup"
       ? 0
@@ -82,15 +78,17 @@ export default function CarritoPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: cart,
-          user_id: user.id,
+          user, // 🔥 ahora mandamos el objeto completo
           shipping: {
+            shipping_type: shippingType,
+            shipping_cost: shippingCost,
+          },
+          customer: {
             full_name: fullName,
             phone,
             address,
             city,
             postal_code: postalCode,
-            shipping_type: shippingType,
-            shipping_cost: shippingCost,
           },
         }),
       });
@@ -99,9 +97,12 @@ export default function CarritoPage() {
 
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        showMessage("Error al crear sesión de pago");
       }
     } catch (error) {
       console.error(error);
+      showMessage("Error inesperado");
     } finally {
       setLoading(false);
     }
@@ -129,13 +130,12 @@ export default function CarritoPage() {
     <div className="min-h-screen bg-[#faf9ff] relative">
 
       {showToast && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-4 rounded-2xl shadow-2xl font-semibold animate-bounce z-50">
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-4 rounded-2xl shadow-2xl font-semibold z-50">
           {message}
         </div>
       )}
 
       <div className="max-w-7xl mx-auto px-6 py-12">
-
         <h1 className="text-4xl font-bold text-neutral-900 mb-12">
           Carrito
         </h1>
@@ -168,7 +168,7 @@ export default function CarritoPage() {
                 <div className="flex items-center gap-4 pt-2">
                   <button
                     onClick={() => decreaseQuantity(item.variant_id)}
-                    className="w-10 h-10 rounded-xl border border-neutral-300 hover:bg-[#f3e8ff] transition"
+                    className="w-10 h-10 rounded-xl border border-neutral-300"
                   >
                     −
                   </button>
@@ -179,7 +179,7 @@ export default function CarritoPage() {
 
                   <button
                     onClick={() => increaseQuantity(item.variant_id)}
-                    className="w-10 h-10 rounded-xl border border-neutral-300 hover:bg-[#f3e8ff] transition"
+                    className="w-10 h-10 rounded-xl border border-neutral-300"
                   >
                     +
                   </button>
@@ -217,15 +217,14 @@ export default function CarritoPage() {
                   placeholder={field.placeholder}
                   value={field.value}
                   onChange={(e) => field.set(e.target.value)}
-                  className="w-full border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#d6a8ff] transition"
+                  className="w-full border border-neutral-300 px-5 py-3 rounded-2xl"
                 />
               ))}
 
-              {/* ✅ SOLO AGREGAMOS PICKUP */}
               <select
                 value={shippingType}
                 onChange={(e) => setShippingType(e.target.value)}
-                className="w-full border border-neutral-300 px-5 py-3 rounded-2xl text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#d6a8ff] transition"
+                className="w-full border border-neutral-300 px-5 py-3 rounded-2xl"
               >
                 <option value="pickup">Recoger en tienda (Gratis)</option>
                 <option value="local">Entrega local ($50)</option>
@@ -253,14 +252,14 @@ export default function CarritoPage() {
             <button
               onClick={handleCheckout}
               disabled={loading}
-              className="mt-10 bg-[#d6a8ff] text-black font-semibold px-6 py-4 rounded-2xl w-full hover:opacity-90 transition disabled:opacity-50"
+              className="mt-10 bg-[#d6a8ff] text-black font-semibold px-6 py-4 rounded-2xl w-full disabled:opacity-50"
             >
               {loading ? "Procesando..." : "Pagar con tarjeta"}
             </button>
 
             <button
               onClick={clearCart}
-              className="mt-4 border border-neutral-300 text-neutral-700 px-6 py-4 rounded-2xl w-full hover:bg-neutral-100 transition"
+              className="mt-4 border border-neutral-300 text-neutral-700 px-6 py-4 rounded-2xl w-full"
             >
               Vaciar carrito
             </button>

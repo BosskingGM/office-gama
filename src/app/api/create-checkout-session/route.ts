@@ -7,7 +7,14 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(req: Request) {
   try {
-    const { items, shipping } = await req.json();
+    const { items, shipping, user, customer } = await req.json();
+
+    if (!items || items.length === 0) {
+      return NextResponse.json(
+        { error: "No hay productos en el carrito" },
+        { status: 400 }
+      );
+    }
 
     const line_items = items.map((item: any) => ({
       price_data: {
@@ -20,8 +27,8 @@ export async function POST(req: Request) {
       quantity: item.quantity,
     }));
 
-    // 🔥 ENVÍO REAL AGREGADO A STRIPE
-    if (shipping.shipping_cost > 0) {
+    // Agregar envío como producto
+    if (shipping?.shipping_cost > 0) {
       line_items.push({
         price_data: {
           currency: "mxn",
@@ -29,7 +36,7 @@ export async function POST(req: Request) {
             name:
               shipping.shipping_type === "local"
                 ? "Envío local"
-                : "Estafeta nacional",
+                : "Envío nacional",
           },
           unit_amount: Math.round(shipping.shipping_cost * 100),
         },
@@ -43,15 +50,25 @@ export async function POST(req: Request) {
       mode: "payment",
       success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/checkout/success`,
       cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/carrito`,
+
       metadata: {
-        shipping_type: shipping.shipping_type,
-        shipping_cost: shipping.shipping_cost.toString(),
+        user_id: user?.id || "",
+        items: JSON.stringify(items),
+
+        full_name: customer?.full_name || "",
+        phone: customer?.phone || "",
+        address: customer?.address || "",
+        city: customer?.city || "",
+        postal_code: customer?.postal_code || "",
+
+        shipping_type: shipping?.shipping_type || "",
+        shipping_cost: shipping?.shipping_cost?.toString() || "0",
       },
     });
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Error creando sesión:", error);
     return NextResponse.json(
       { error: "Error creando sesión" },
       { status: 500 }

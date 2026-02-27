@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 export const dynamic = "force-dynamic";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-
+ 
 });
 
 const supabase = createClient(
@@ -34,22 +34,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Webhook Error" }, { status: 400 });
   }
 
-  // 🎯 Pago completado
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
     const items = JSON.parse(session.metadata?.items || "[]");
-    const user_id = session.metadata?.user_id;
-    const user_email = session.customer_details?.email;
-
+    const user_id = session.metadata?.user_id || null;
     const total = session.amount_total! / 100;
 
-    // 🧠 Evitar órdenes duplicadas
+    // Evitar duplicados
     const { data: existingOrder } = await supabase
       .from("orders")
       .select("id")
       .eq("stripe_session_id", session.id)
-      .single();
+      .maybeSingle();
 
     if (existingOrder) {
       return NextResponse.json({ received: true });
@@ -60,14 +57,16 @@ export async function POST(req: Request) {
       .insert({
         stripe_session_id: session.id,
         user_id,
-        user_email,
-        total,
+        user_email: session.customer_details?.email,
+        total_amount: total,
         status: "pagado",
+
         full_name: session.metadata?.full_name,
         phone: session.metadata?.phone,
         address: session.metadata?.address,
         city: session.metadata?.city,
         postal_code: session.metadata?.postal_code,
+
         shipping_type: session.metadata?.shipping_type,
         shipping_cost: Number(session.metadata?.shipping_cost || 0),
       })
@@ -75,8 +74,11 @@ export async function POST(req: Request) {
       .single();
 
     if (orderError) {
-      console.error("Error creando orden:", orderError);
-      return NextResponse.json({ error: "Error guardando orden" }, { status: 500 });
+      console.error("❌ Error creando orden:", orderError);
+      return NextResponse.json(
+        { error: "Error guardando orden" },
+        { status: 500 }
+      );
     }
 
     // Insertar productos
@@ -88,6 +90,7 @@ export async function POST(req: Request) {
         price: item.price,
       });
 
+      // Descontar stock
       await supabase.rpc("decrement_stock", {
         variant_id_input: item.variant_id,
         quantity_input: item.quantity,
