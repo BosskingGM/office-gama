@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       payment_method_types: ["card"],
       line_items,
       mode: "payment",
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/success`,
+      success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/checkout/success`,
       cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/carrito`,
       metadata: {
         shipping_type: shipping.shipping_type,
