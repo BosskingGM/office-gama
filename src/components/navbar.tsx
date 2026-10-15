@@ -235,6 +235,7 @@ export default function Navbar() {
 
             <div className="flex flex-col gap-1 font-medium">
               <Link
+                onClick={() => setOpen(false)}
                 href="/"
                 className="px-3 py-3 rounded-xl hover:bg-brand-soft transition"
               >
@@ -242,6 +243,7 @@ export default function Navbar() {
               </Link>
               {user && (
                 <Link
+                onClick={() => setOpen(false)}
                   href="/cuenta"
                   className="px-3 py-3 rounded-xl hover:bg-brand-soft transition flex items-center gap-2"
                 >
@@ -250,6 +252,7 @@ export default function Navbar() {
               )}
               {isAdmin && (
                 <Link
+                onClick={() => setOpen(false)}
                   href="/admin"
                   className="px-3 py-3 rounded-xl hover:bg-brand-soft transition flex items-center gap-2"
                 >
@@ -273,10 +276,10 @@ export default function Navbar() {
                 </>
               ) : (
                 <>
-                  <Link href="/registro" className="btn-primary w-full">
+                  <Link onClick={() => setOpen(false)} href="/registro" className="btn-primary w-full">
                     Crear cuenta
                   </Link>
-                  <Link href="/login" className="btn-outline w-full">
+                  <Link onClick={() => setOpen(false)} href="/login" className="btn-outline w-full">
                     Iniciar sesión
                   </Link>
                 </>

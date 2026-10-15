@@ -1,260 +1,741 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ImageOff, Loader2, Search, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { SHIPPING_OPTIONS } from "@/lib/shipping";
+import StatusBadge from "@/components/StatusBadge";
+
+/* =========================
+   TIPOS Y AYUDAS
+========================= */
+
+type Item = {
+  id: string;
+  quantity: number | null;
+  price: number | string | null;
+  product_name: string | null;
+  variant_name: string | null;
+  product_variants: {
+    image_url: string | null;
+    model_name: string | null;
+    products: { name: string | null } | { name: string | null }[] | null;
+  } | null;
+};
+
+type Order = {
+  id: string;
+  created_at: string;
+  status: string | null;
+  total: number | string | null;
+  notes: string | null;
+  full_name: string | null;
+  user_email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  postal_code: string | null;
+  shipping_type: string | null;
+  shipping_cost: number | string | null;
+  order_items: Item[] | null;
+};
+
+type Filter = "pagado" | "enviado" | "entregado" | "cancelado" | "todos";
+
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "pagado", label: "Por enviar" },
+  { id: "enviado", label: "Enviados" },
+  { id: "entregado", label: "Entregados" },
+  { id: "cancelado", label: "Cancelados" },
+  { id: "todos", label: "Todos" },
+];
+
+const TZ = "America/Mexico_City";
+
+const money = (n: number | string | null | undefined) =>
+  Number(n ?? 0).toLocaleString("es-MX", {
+    style: "currency",
+    currency: "MXN",
+  });
+
+const formatDate = (iso: string) =>
+  new Date(iso).toLocaleString("es-MX", {
+    timeZone: TZ,
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+const norm = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+const statusOf = (o: Order) => (o.status ?? "").toLowerCase();
+
+const itemName = (it: Item) => {
+  const p = it.product_variants?.products;
+  const fromJoin = Array.isArray(p) ? p[0]?.name : p?.name;
+  return it.product_name || fromJoin || "Producto";
+};
+
+const itemModel = (it: Item) => {
+  const m = it.variant_name || it.product_variants?.model_name || "";
+  return m && m !== "Único" ? m : "";
+};
+
+const isPickup = (o: Order) => o.shipping_type === "pickup";
+
+const shippingLabel = (o: Order) => {
+  const key = o.shipping_type as keyof typeof SHIPPING_OPTIONS | null;
+  return (key && SHIPPING_OPTIONS[key]?.label) || o.shipping_type || "—";
+};
+
+const summary = (o: Order) => {
+  const items = o.order_items ?? [];
+  if (items.length === 0) return "Sin artículos";
+  const first = itemName(items[0]);
+  return items.length > 1 ? `${first} y ${items.length - 1} más` : first;
+};
+
+const pieces = (o: Order) =>
+  (o.order_items ?? []).reduce((acc, it) => acc + (it.quantity ?? 0), 0);
+
+type Msg = { kind: "ok" | "warn" | "error"; text: string };
+
+/* =========================
+   PÁGINA
+========================= */
 
 export default function AdminPedidos() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  const [filter, setFilter] = useState<Filter>("pagado");
+  const [search, setSearch] = useState("");
 
-  const fetchOrders = async () => {
-    const { data } = await supabase
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Msg | null>(null);
+
+  const fetchOrders = useCallback(async () => {
+    const { data, error } = await supabase
       .from("orders")
-      .select(`
-        *,
+      .select(
+        `
+        id, created_at, status, total, notes, full_name, user_email, phone,
+        address, city, postal_code, shipping_type, shipping_cost,
         order_items (
-          *,
-          product_variants (
-            *,
-            products (*)
-          )
+          id, quantity, price, product_name, variant_name,
+          product_variants ( image_url, model_name, products ( name ) )
         )
-      `)
+      `
+      )
       .order("created_at", { ascending: false });
 
-    setOrders(data || []);
-  };
+    if (error) {
+      setLoadError(`No se pudieron cargar los pedidos: ${error.message}`);
+      return;
+    }
+    setLoadError("");
+    setOrders((data ?? []) as unknown as Order[]);
+  }, []);
 
-  // 🔥 FORMATO MÉXICO CORRECTO
-  const formatMXDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("es-MX", {
-      timeZone: "America/Mexico_City",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
+  useEffect(() => {
+    // Los enlaces del dashboard traen ?estado=... y ?q=...
+    const params = new URLSearchParams(window.location.search);
+    const estado = params.get("estado");
+    if (FILTERS.some((f) => f.id === estado)) setFilter(estado as Filter);
+    const q = params.get("q");
+    if (q) setSearch(q);
+
+    fetchOrders().finally(() => setLoading(false));
+  }, [fetchOrders]);
+
+  const selected = orders.find((o) => o.id === selectedId) ?? null;
+
+  const closePanel = useCallback(() => {
+    setSelectedId(null);
+    setMsg(null);
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) closePanel();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [selected, busy, closePanel]);
+
+  /* ---------- Acciones ---------- */
+
+  const sendShippedEmail = async (orderId: string) => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const res = await fetch("/api/send-shipped-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.access_token ?? ""}`,
+      },
+      body: JSON.stringify({ orderId }),
     });
+    return res.ok;
   };
 
-  const handleUpdateStatus = async (
-    orderId: string,
-    newStatus: string
+  const changeStatus = async (
+    order: Order,
+    newStatus: string,
+    withEmail = false
   ) => {
-    setLoading(true);
+    setBusy(true);
+    setMsg(null);
 
     const { error } = await supabase
       .from("orders")
       .update({ status: newStatus })
-      .eq("id", orderId);
+      .eq("id", order.id);
 
     if (error) {
-      setLoading(false);
+      setMsg({
+        kind: "error",
+        text: `No se pudo cambiar el estado: ${error.message}`,
+      });
+      setBusy(false);
       return;
     }
 
-    if (newStatus === "enviado") {
-      // La ruta de correo exige sesión de administrador: se manda el token.
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    let result: Msg = {
+      kind: "ok",
+      text: `Pedido marcado como ${newStatus}.`,
+    };
 
-      const res = await fetch("/api/send-shipped-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token ?? ""}`,
-        },
-        body: JSON.stringify({ orderId }),
-      });
-
-      if (!res.ok) {
-        alert(
-          "El pedido se marcó como enviado, pero el correo al cliente no pudo enviarse."
-        );
-      }
+    if (withEmail) {
+      const sent = await sendShippedEmail(order.id).catch(() => false);
+      result = sent
+        ? {
+            kind: "ok",
+            text: "Pedido marcado como enviado y se avisó al cliente por correo.",
+          }
+        : {
+            kind: "warn",
+            text: "El pedido quedó como enviado, pero el correo al cliente no se pudo enviar. Usa “Reenviar correo” para intentarlo de nuevo.",
+          };
     }
 
     await fetchOrders();
-    setSelectedOrder(null);
-    setLoading(false);
+    setMsg(result);
+    setBusy(false);
   };
 
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case "pagado":
-        return "bg-neutral-200 text-neutral-900";
-      case "enviado":
-        return "bg-[#d6a8ff] text-black";
-      case "entregado":
-        return "bg-neutral-900 text-white";
-      case "cancelado":
-        return "bg-neutral-300 text-neutral-700";
-      default:
-        return "bg-neutral-200 text-neutral-800";
-    }
+  const resendEmail = async (order: Order) => {
+    setBusy(true);
+    setMsg(null);
+    const sent = await sendShippedEmail(order.id).catch(() => false);
+    setMsg(
+      sent
+        ? { kind: "ok", text: "Correo reenviado al cliente." }
+        : { kind: "error", text: "No se pudo enviar el correo. Intenta más tarde." }
+    );
+    setBusy(false);
   };
+
+  const cancelOrder = (order: Order) => {
+    const ok = confirm(
+      "¿Cancelar este pedido?\n\nLas piezas no regresan solas al inventario; si hace falta, ajústalas en Inventario."
+    );
+    if (ok) changeStatus(order, "cancelado");
+  };
+
+  /* ---------- Lista filtrada ---------- */
+
+  const counts = useMemo(() => {
+    const c: Record<Filter, number> = {
+      pagado: 0,
+      enviado: 0,
+      entregado: 0,
+      cancelado: 0,
+      todos: orders.length,
+    };
+    for (const o of orders) {
+      const s = statusOf(o);
+      if (s === "pagado" || s === "enviado" || s === "entregado" || s === "cancelado") {
+        c[s]++;
+      }
+    }
+    return c;
+  }, [orders]);
+
+  const filtered = useMemo(() => {
+    const q = norm(search.trim().replace(/^#/, ""));
+    return orders.filter((o) => {
+      if (filter !== "todos" && statusOf(o) !== filter) return false;
+      if (!q) return true;
+      const hay = norm(
+        [
+          o.id,
+          o.full_name,
+          o.user_email,
+          o.phone,
+          ...(o.order_items ?? []).map(itemName),
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+      return hay.includes(q);
+    });
+  }, [orders, filter, search]);
+
+  /* =========================
+     RENDER
+  ========================= */
 
   return (
-    <div className="min-h-screen bg-[#faf9ff] px-6 py-12">
-      <div className="max-w-6xl mx-auto space-y-10">
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold">Pedidos</h1>
+        <p className="text-sm text-muted mt-1">
+          {loading
+            ? "Cargando…"
+            : `${orders.length} ${orders.length === 1 ? "pedido" : "pedidos"} en total`}
+        </p>
+      </div>
 
-        <h1 className="text-3xl font-bold text-neutral-900">
-          Gestión de pedidos
-        </h1>
-
-        {/* LISTA */}
-        <div className="space-y-4">
-          {orders.map((order) => (
-            <div
-              key={order.id}
-              onClick={() => setSelectedOrder(order)}
-              className="bg-white border border-neutral-200 rounded-2xl p-6 cursor-pointer hover:shadow-md transition flex flex-col sm:flex-row sm:justify-between gap-4"
-            >
-              <div>
-                <p className="font-semibold text-neutral-900">
-                  Pedido #{order.id.slice(0, 8)}
-                </p>
-                <p className="text-sm text-neutral-500">
-                  {formatMXDate(order.created_at)}
-                </p>
-              </div>
-
-              <div className="sm:text-right">
-                <p className="font-semibold text-neutral-900">
-                  ${order.total} MXN
-                </p>
-                <span
-                  className={`inline-block mt-2 px-4 py-1 rounded-full text-xs font-medium ${getStatusStyle(
-                    order.status
-                  )}`}
-                >
-                  {order.status}
-                </span>
-              </div>
-            </div>
-          ))}
+      <div className="card p-4 space-y-3">
+        <div className="relative">
+          <Search
+            size={16}
+            aria-hidden="true"
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"
+          />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por cliente, correo, teléfono, producto o número"
+            aria-label="Buscar pedidos"
+            className="field !pl-10"
+          />
         </div>
 
-        {/* MODAL */}
-        {selectedOrder && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-8 space-y-6 relative border border-neutral-200">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFilter(f.id)}
+              aria-pressed={filter === f.id}
+              className={`shrink-0 rounded-full border-2 px-3.5 py-1.5 text-sm font-medium transition ${
+                filter === f.id
+                  ? "bg-brand border-brand text-ink"
+                  : "bg-white border-line hover:border-brand"
+              }`}
+            >
+              {f.label}
+              <span className="ml-1.5 text-muted">{counts[f.id]}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
+      {loadError ? (
+        <div className="card p-6 text-sm text-danger flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          <span>{loadError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              fetchOrders().finally(() => setLoading(false));
+            }}
+            className="btn-outline"
+          >
+            Reintentar
+          </button>
+        </div>
+      ) : loading ? (
+        <div className="space-y-3">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="skeleton h-24" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card p-10 text-center space-y-3">
+          <p className="font-semibold">
+            {search
+              ? "Ningún pedido coincide con la búsqueda"
+              : filter === "pagado"
+              ? "No hay pedidos por enviar"
+              : "No hay pedidos en esta vista"}
+          </p>
+          {filter !== "todos" && (
+            <button
+              type="button"
+              onClick={() => setFilter("todos")}
+              className="btn-outline"
+            >
+              Ver todos los pedidos
+            </button>
+          )}
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {filtered.map((o) => (
+            <li key={o.id}>
               <button
-                onClick={() => setSelectedOrder(null)}
-                className="absolute top-5 right-6 text-neutral-500 hover:text-neutral-900 text-lg"
+                type="button"
+                onClick={() => {
+                  setMsg(null);
+                  setSelectedId(o.id);
+                }}
+                className="card card-hover w-full text-left p-4 sm:p-5 flex items-center gap-4"
               >
-                ✕
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold truncate">
+                    {o.full_name || "Cliente sin nombre"}
+                  </p>
+                  <p className="text-sm text-secondary truncate">
+                    {summary(o)}
+                  </p>
+                  <p className="text-xs text-muted mt-1">
+                    #{o.id.slice(0, 8)} · {formatDate(o.created_at)} ·{" "}
+                    {isPickup(o) ? "Recoger en tienda" : shippingLabel(o)}
+                    {o.notes ? " · Con aviso" : ""}
+                  </p>
+                </div>
+                <div className="text-right shrink-0 space-y-1.5">
+                  <p className="font-bold">{money(o.total)}</p>
+                  <StatusBadge status={o.status ?? ""} />
+                </div>
               </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
-              <h2 className="text-2xl font-semibold text-neutral-900">
-                Pedido #{selectedOrder.id.slice(0, 8)}
-              </h2>
+      {/* =========================
+          DETALLE DEL PEDIDO
+      ========================= */}
+      {selected && (
+        <div className="fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-ink/40"
+            onClick={() => !busy && closePanel()}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pedido-title"
+            className="absolute right-0 top-0 h-full w-full sm:max-w-xl bg-white shadow-2xl flex flex-col animate-slide-in-right"
+          >
+            <header className="flex items-start justify-between gap-3 px-5 sm:px-7 py-4 border-b border-line">
+              <div className="min-w-0">
+                <h2 id="pedido-title" className="text-xl font-extrabold">
+                  Pedido #{selected.id.slice(0, 8)}
+                </h2>
+                <p className="text-sm text-muted mt-0.5">
+                  {formatDate(selected.created_at)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <StatusBadge status={selected.status ?? ""} />
+                <button
+                  type="button"
+                  onClick={closePanel}
+                  disabled={busy}
+                  aria-label="Cerrar"
+                  className="p-2 rounded-full hover:bg-neutral-100 disabled:opacity-40"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </header>
 
-              <p className="text-sm text-neutral-500">
-                {formatMXDate(selectedOrder.created_at)}
-              </p>
+            <div className="flex-1 overflow-y-auto px-5 sm:px-7 py-6 space-y-6">
+              {msg && (
+                <p
+                  role="status"
+                  className={`text-sm rounded-xl border px-4 py-3 ${
+                    msg.kind === "ok"
+                      ? "bg-green-50 border-green-200 text-green-900"
+                      : msg.kind === "warn"
+                      ? "bg-amber-50 border-amber-200 text-amber-900"
+                      : "bg-red-50 border-red-200 text-red-900"
+                  }`}
+                >
+                  {msg.text}
+                </p>
+              )}
 
-              <p className="text-neutral-700">
-                Total: <strong>${selectedOrder.total} MXN</strong>
-              </p>
-
-              {selectedOrder.notes && (
-                <div className="border border-neutral-900 bg-neutral-50 rounded-2xl p-4 text-sm text-neutral-900">
-                  <strong>Atención:</strong> {selectedOrder.notes}
+              {selected.notes && (
+                <div className="rounded-xl border border-peach bg-peach-soft px-4 py-3 text-sm">
+                  <strong>Atención:</strong> {selected.notes}
                 </div>
               )}
 
-              {/* Cliente */}
-              <Section title="Cliente">
-                <p>{selectedOrder.full_name}</p>
-                <p>{selectedOrder.user_email}</p>
-                <p>{selectedOrder.phone}</p>
-              </Section>
-
-              {/* Dirección */}
-              <Section title="Dirección">
-                <p>{selectedOrder.address}</p>
-                <p>{selectedOrder.city}</p>
-                <p>CP: {selectedOrder.postal_code}</p>
-                <p>Envío: {selectedOrder.shipping_type}</p>
-              </Section>
-
-              {/* Productos */}
-              <Section title="Productos">
-                <div className="space-y-4">
-                  {selectedOrder.order_items.map((item: any) => (
-                    <div
-                      key={item.id}
-                      className="flex gap-4 border border-neutral-200 rounded-2xl p-4"
+              <Block title="Cliente">
+                <p className="font-medium">{selected.full_name || "—"}</p>
+                {selected.user_email && (
+                  <p>
+                    <a
+                      href={`mailto:${selected.user_email}`}
+                      className="text-brand-strong hover:underline break-all"
                     >
-                      <img
-                        src={
-                          item.product_variants?.image_url ||
-                          "https://via.placeholder.com/100"
-                        }
-                        alt="producto"
-                        className="w-20 h-20 object-cover rounded-xl"
-                      />
-
-                      <div>
-                        <p className="font-medium text-neutral-900">
-                          {item.product_name ||
-                            item.product_variants?.products?.name}
-                          {(item.variant_name ||
-                            item.product_variants?.model_name) &&
-                            ` (${
-                              item.variant_name ||
-                              item.product_variants?.model_name
-                            })`}
-                        </p>
-                        <p className="text-sm text-neutral-500">
-                          Cantidad: {item.quantity}
-                        </p>
-                        <p className="text-sm text-neutral-500">
-                          Precio: ${item.price}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-
-              {/* BOTONES */}
-              <div className="grid grid-cols-2 gap-3 pt-4">
-                {["pagado", "enviado", "entregado", "cancelado"].map(
-                  (status) => (
-                    <button
-                      key={status}
-                      disabled={loading}
-                      onClick={() =>
-                        handleUpdateStatus(selectedOrder.id, status)
-                      }
-                      className="bg-neutral-900 text-white py-3 rounded-2xl hover:opacity-90 transition text-sm"
-                    >
-                      Marcar {status}
-                    </button>
-                  )
+                      {selected.user_email}
+                    </a>
+                  </p>
                 )}
-              </div>
+                {selected.phone && (
+                  <p>
+                    <a
+                      href={`tel:${selected.phone}`}
+                      className="text-brand-strong hover:underline"
+                    >
+                      {selected.phone}
+                    </a>
+                  </p>
+                )}
+              </Block>
 
+              <Block title="Entrega">
+                <p className="font-medium">{shippingLabel(selected)}</p>
+                {isPickup(selected) ? (
+                  <p className="text-muted">
+                    El cliente recoge en la tienda; no hay dirección de envío.
+                  </p>
+                ) : (
+                  <>
+                    <p>{selected.address || "—"}</p>
+                    <p>
+                      {[selected.city, selected.postal_code && `CP ${selected.postal_code}`]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </p>
+                  </>
+                )}
+              </Block>
+
+              <Block title="Productos">
+                <ul className="space-y-3">
+                  {(selected.order_items ?? []).map((it) => {
+                    const img = it.product_variants?.image_url;
+                    const model = itemModel(it);
+                    const qty = it.quantity ?? 0;
+                    return (
+                      <li key={it.id} className="flex gap-3 items-center">
+                        <div className="w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-brand-soft grid place-items-center text-neutral-400">
+                          {img ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={img}
+                              alt=""
+                              loading="lazy"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <ImageOff size={18} aria-hidden="true" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium">
+                            {itemName(it)}
+                            {model && (
+                              <span className="font-normal text-muted">
+                                {" "}
+                                · {model}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-sm text-muted">
+                            {qty} × {money(it.price)}
+                          </p>
+                        </div>
+                        <p className="font-semibold shrink-0">
+                          {money(Number(it.price ?? 0) * qty)}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                <dl className="mt-4 pt-4 border-t border-line space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-muted">
+                      Productos ({pieces(selected)}{" "}
+                      {pieces(selected) === 1 ? "pieza" : "piezas"})
+                    </dt>
+                    <dd>
+                      {money(
+                        (selected.order_items ?? []).reduce(
+                          (acc, it) =>
+                            acc + Number(it.price ?? 0) * (it.quantity ?? 0),
+                          0
+                        )
+                      )}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted">Envío</dt>
+                    <dd>
+                      {Number(selected.shipping_cost ?? 0) > 0
+                        ? money(selected.shipping_cost)
+                        : "Gratis"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between text-base font-bold pt-1">
+                    <dt>Total pagado</dt>
+                    <dd>{money(selected.total)}</dd>
+                  </div>
+                </dl>
+              </Block>
             </div>
-          </div>
-        )}
 
-      </div>
+            {/* Acciones */}
+            <footer className="border-t border-line px-5 sm:px-7 py-4 space-y-3 bg-white">
+              <Actions
+                order={selected}
+                busy={busy}
+                onStatus={changeStatus}
+                onResend={resendEmail}
+                onCancel={cancelOrder}
+              />
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function Section({
+/* =========================
+   ACCIONES SEGÚN EL ESTADO
+========================= */
+
+function Actions({
+  order,
+  busy,
+  onStatus,
+  onResend,
+  onCancel,
+}: {
+  order: Order;
+  busy: boolean;
+  onStatus: (o: Order, status: string, withEmail?: boolean) => void;
+  onResend: (o: Order) => void;
+  onCancel: (o: Order) => void;
+}) {
+  const s = statusOf(order);
+  const pickup = isPickup(order);
+  const canCancel = s === "pagado" || s === "pendiente" || s === "enviado";
+
+  return (
+    <>
+      <div className="flex flex-col sm:flex-row gap-3">
+        {s === "pagado" && !pickup && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onStatus(order, "enviado", true)}
+            className="btn-primary flex-1"
+          >
+            {busy ? <Loader2 size={18} className="animate-spin" /> : null}
+            Marcar como enviado y avisar
+          </button>
+        )}
+
+        {s === "pagado" && pickup && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onStatus(order, "entregado")}
+            className="btn-primary flex-1"
+          >
+            {busy ? <Loader2 size={18} className="animate-spin" /> : null}
+            Ya lo recogió (entregado)
+          </button>
+        )}
+
+        {s === "enviado" && (
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onStatus(order, "entregado")}
+              className="btn-primary flex-1"
+            >
+              {busy ? <Loader2 size={18} className="animate-spin" /> : null}
+              Marcar como entregado
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onResend(order)}
+              className="btn-outline"
+            >
+              Reenviar correo
+            </button>
+          </>
+        )}
+
+        {canCancel && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onCancel(order)}
+            className="btn-outline text-danger"
+          >
+            Cancelar pedido
+          </button>
+        )}
+      </div>
+
+      {(s === "entregado" || s === "cancelado") && (
+        <p className="text-sm text-muted">
+          Este pedido ya está {s === "entregado" ? "entregado" : "cancelado"}.
+        </p>
+      )}
+
+      <details className="text-sm">
+        <summary className="cursor-pointer text-muted hover:text-ink select-none">
+          Corregir estado manualmente
+        </summary>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {["pagado", "enviado", "entregado", "cancelado"]
+            .filter((st) => st !== s)
+            .map((st) => (
+              <button
+                key={st}
+                type="button"
+                disabled={busy}
+                onClick={() => onStatus(order, st)}
+                className="rounded-full border border-line px-3.5 py-1.5 hover:border-brand hover:bg-brand-soft transition disabled:opacity-50"
+              >
+                Poner “{st}”
+              </button>
+            ))}
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          Cambia solo el estado: no envía correo ni mueve el inventario.
+        </p>
+      </details>
+    </>
+  );
+}
+
+/* =========================
+   BLOQUE DE INFORMACIÓN
+========================= */
+
+function Block({
   title,
   children,
 }: {
@@ -262,13 +743,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="border border-neutral-200 rounded-2xl p-6 space-y-2">
-      <h3 className="font-semibold text-neutral-900">
-        {title}
-      </h3>
-      <div className="text-neutral-700 text-sm space-y-1">
+    <section>
+      <h3 className="text-sm font-bold mb-2">{title}</h3>
+      <div className="rounded-2xl border border-line bg-soft p-4 text-sm space-y-1">
         {children}
       </div>
-    </div>
+    </section>
   );
 }

@@ -20,6 +20,11 @@ const STATUS: Record<
     className: "bg-blue-100 text-blue-800",
     help: "Tu pedido va en camino. Te avisamos por correo al enviarlo.",
   },
+  entregado: {
+    label: "Entregado",
+    className: "bg-purple-100 text-purple-800",
+    help: "Tu pedido fue entregado. ¡Gracias por tu compra!",
+  },
   cancelado: {
     label: "Cancelado",
     className: "bg-red-100 text-red-700",
