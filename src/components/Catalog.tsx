@@ -134,10 +134,10 @@ export default function Catalog({ products }: { products: Product[] }) {
 
       {/* Barra de búsqueda y filtros */}
       <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
-        <div className="relative flex-1 lg:max-w-md">
+        <div className="relative w-full lg:flex-1 lg:max-w-md">
           <Search
             size={18}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none"
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none z-10"
           />
           <input
             type="search"
@@ -145,16 +145,16 @@ export default function Catalog({ products }: { products: Product[] }) {
             onChange={(e) => withReset(setSearch)(e.target.value)}
             placeholder="Buscar productos…"
             aria-label="Buscar productos"
-            className="field rounded-full! pl-11"
+            className="field rounded-full! pl-11 pr-4 py-2.5! [&::-webkit-search-cancel-button]:appearance-none"
           />
         </div>
 
-        <div className="flex flex-wrap gap-3 items-center">
+        <div className="grid grid-cols-2 gap-2.5 lg:flex lg:flex-wrap lg:gap-3 lg:items-center">
           <select
             value={priceKey}
             onChange={(e) => withReset(setPriceKey)(e.target.value)}
             aria-label="Filtrar por precio"
-            className="field w-auto! rounded-full! py-2.5! pr-8 text-sm"
+            className="field w-full! lg:w-auto! min-w-0 rounded-full! py-2.5! px-4! pr-8! text-sm! truncate"
           >
             {PRICE_RANGES.map((r) => (
               <option key={r.key} value={r.key}>
@@ -167,7 +167,7 @@ export default function Catalog({ products }: { products: Product[] }) {
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
             aria-label="Ordenar productos"
-            className="field w-auto! rounded-full! py-2.5! pr-8 text-sm"
+            className="field w-full! lg:w-auto! min-w-0 rounded-full! py-2.5! px-4! pr-8! text-sm! truncate"
           >
             {Object.entries(SORTS).map(([k, label]) => (
               <option key={k} value={k}>
@@ -176,7 +176,7 @@ export default function Catalog({ products }: { products: Product[] }) {
             ))}
           </select>
 
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+          <label className="col-span-2 flex items-center gap-2 text-sm cursor-pointer select-none py-1">
             <input
               type="checkbox"
               checked={onlyAvailable}

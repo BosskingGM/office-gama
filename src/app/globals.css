@@ -129,6 +129,11 @@ h3 {
   display: none;
 }
 
+/* IMPORTANTE: estas clases van dentro de @layer components para que las
+   utilidades de Tailwind (pl-11, px-8, p-0!, etc.) puedan sobrescribirlas.
+   Fuera de una capa, el CSS normal le gana a Tailwind y por eso la lupa
+   quedaba encima del texto del buscador. */
+@layer components {
 /* =========================
    BOTONES
 ========================= */
@@ -209,13 +214,27 @@ h3 {
   border: 1.5px solid var(--border-soft);
   border-radius: 0.9rem;
   padding: 0.75rem 1rem;
-  font-size: 0.95rem;
+  font-size: 1rem; /* 16px: iOS hace zoom al enfocar si es menor */
+  line-height: 1.4;
+  -webkit-appearance: none;
+  appearance: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+@media (min-width: 640px) {
+  .field {
+    font-size: 0.95rem;
+  }
+}
+/* Los <select> sí conservan su flecha nativa */
+select.field {
+  -webkit-appearance: menulist;
+  appearance: menulist;
 }
 .field:focus {
   outline: none;
   border-color: var(--primary-hover);
   box-shadow: 0 0 0 4px var(--primary-soft);
+}
 }
 
 /* =========================

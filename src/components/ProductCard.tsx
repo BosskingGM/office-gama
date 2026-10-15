@@ -89,7 +89,7 @@ export default function ProductCard({ product }: { product: Product }) {
       {/* Imagen */}
       <Link
         href={href}
-        className="relative block w-full aspect-square bg-brand-soft overflow-hidden"
+        className="relative block w-full aspect-[4/3] sm:aspect-square bg-brand-soft overflow-hidden"
         onMouseEnter={startCycle}
         onMouseLeave={stopCycle}
         aria-label={`Ver ${product.name}`}
@@ -112,7 +112,7 @@ export default function ProductCard({ product }: { product: Product }) {
         )}
 
         {/* Etiquetas */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 flex flex-col gap-1.5 items-start">
           {soldOut && (
             <span className="bg-ink text-white text-[11px] font-semibold px-2.5 py-1 rounded-full">
               Agotado

@@ -85,11 +85,11 @@ export default function ProductDetail({
   };
 
   return (
-    <div className="card p-4 sm:p-8 lg:p-10">
-      <div className="grid md:grid-cols-2 gap-8 lg:gap-14 items-start">
+    <div className="card p-3 sm:p-8 lg:p-10">
+      <div className="grid md:grid-cols-2 gap-5 sm:gap-8 lg:gap-14 items-start">
         {/* GALERÍA */}
         <div className="space-y-3 md:sticky md:top-28">
-          <div className="relative aspect-square rounded-2xl overflow-hidden bg-brand-soft border border-line">
+          <div className="relative aspect-[5/4] sm:aspect-square rounded-2xl overflow-hidden bg-brand-soft border border-line">
             {selected?.image_url ? (
               <img
                 src={selected.image_url}
@@ -120,7 +120,7 @@ export default function ProductDetail({
                   onClick={() => selectVariant(v.id)}
                   aria-label={`Ver modelo ${v.model_name ?? ""}`}
                   aria-pressed={v.id === selectedId}
-                  className={`shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border-2 transition ${
+                  className={`shrink-0 w-14 h-14 sm:w-20 sm:h-20 rounded-xl overflow-hidden border-2 transition ${
                     v.id === selectedId
                       ? "border-brand-strong"
                       : "border-transparent hover:border-brand"
@@ -139,20 +139,20 @@ export default function ProductDetail({
         </div>
 
         {/* INFORMACIÓN */}
-        <div className="space-y-6">
-          <div className="space-y-3">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-2 sm:space-y-3">
             {product.category && (
               <span className="inline-block bg-brand-soft text-brand-strong text-xs px-3.5 py-1.5 rounded-full font-semibold">
                 {product.category}
               </span>
             )}
-            <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight">
+            <h1 className="text-2xl sm:text-4xl font-extrabold leading-tight">
               {product.name}
             </h1>
           </div>
 
           <div>
-            <p className="text-3xl font-bold">{money(product.price)}</p>
+            <p className="text-2xl sm:text-3xl font-bold">{money(product.price)}</p>
             {quantity > 1 && (
               <p className="text-sm text-muted mt-1">
                 {quantity} piezas: {money(product.price * quantity)}
