@@ -1,17 +1,22 @@
 import { Resend } from "resend";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Evita que texto escrito por el cliente (nombre, dirección...) se interprete como HTML.
+function esc(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
-export async function sendOrderShippedEmail(orderId: string) {
+// Devuelve true si el correo se envió, false si algo falló.
+export async function sendOrderShippedEmail(orderId: string): Promise<boolean> {
   try {
-    // 🔎 Traer la orden
-    const { data: order, error: orderError } = await supabase
+    const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
       .select("*")
       .eq("id", orderId)
@@ -19,16 +24,23 @@ export async function sendOrderShippedEmail(orderId: string) {
 
     if (orderError || !order) {
       console.error("Error trayendo orden:", orderError);
-      return;
+      return false;
     }
 
-    // 🔎 Traer productos con tu estructura real
-    const { data: items, error: itemsError } = await supabase
+    if (!order.user_email) {
+      console.error("El pedido no tiene correo del cliente:", orderId);
+      return false;
+    }
+
+    const { data: items, error: itemsError } = await supabaseAdmin
       .from("order_items")
       .select(`
         quantity,
         price,
+        product_name,
+        variant_name,
         product_variants (
+          model_name,
           products (
             name
           )
@@ -38,39 +50,46 @@ export async function sendOrderShippedEmail(orderId: string) {
 
     if (itemsError) {
       console.error("Error trayendo items:", itemsError);
-      return;
+      return false;
     }
 
-    // 🧾 Construir tabla de productos
-    const productsHtml = items
-      ?.map(
-        (item: any) => `
+    const productsHtml = (items || [])
+      .map((item: any) => {
+        const variant = Array.isArray(item.product_variants)
+          ? item.product_variants[0]
+          : item.product_variants;
+        const product = Array.isArray(variant?.products)
+          ? variant.products[0]
+          : variant?.products;
+
+        // Se prefiere el nombre guardado al comprar; si no existe, el actual.
+        const name = item.product_name || product?.name || "Producto";
+        const model = item.variant_name || variant?.model_name || "";
+
+        return `
           <tr>
             <td style="padding:10px 0;">
-              ${item.product_variants?.products?.name || "Producto"}
+              ${esc(name)}${model ? ` <span style="color:#6b7280;">(${esc(model)})</span>` : ""}
             </td>
-            <td style="text-align:center;">
-              ${item.quantity}
-            </td>
-            <td style="text-align:right;">
-              $${item.price} MXN
-            </td>
+            <td style="text-align:center;">${esc(item.quantity)}</td>
+            <td style="text-align:right;">$${esc(item.price)} MXN</td>
           </tr>
-        `
-      )
+        `;
+      })
       .join("");
 
-    // 📧 Enviar correo profesional
-    await resend.emails.send({
+    const shortId = orderId.slice(0, 8);
+
+    const { error: sendError } = await resend.emails.send({
       from: "Office Gama <ventas@officegama.com>",
       to: order.user_email,
-      subject: `Tu pedido #${orderId.slice(0, 8)} ha sido enviado 🚚`,
+      subject: `Tu pedido #${shortId} ha sido enviado 🚚`,
       html: `
         <div style="font-family: Arial, sans-serif; background:#f3f4f6; padding:40px;">
           <div style="max-width:600px; margin:auto; background:white; padding:30px; border-radius:12px; border:1px solid #e5e7eb;">
-            
+
             <h2 style="color:#111827;">
-              Hola ${order.full_name}, 👋
+              Hola ${esc(order.full_name)}, 👋
             </h2>
 
             <p style="color:#374151;">
@@ -78,8 +97,8 @@ export async function sendOrderShippedEmail(orderId: string) {
             </p>
 
             <p>
-              <strong>Pedido:</strong> #${orderId.slice(0, 8)}<br/>
-              <strong>Total:</strong> $${order.total} MXN
+              <strong>Pedido:</strong> #${esc(shortId)}<br/>
+              <strong>Total:</strong> $${esc(order.total)} MXN
             </p>
 
             <hr style="margin:25px 0;" />
@@ -103,11 +122,11 @@ export async function sendOrderShippedEmail(orderId: string) {
 
             <h3>📦 Dirección de envío:</h3>
             <p style="line-height:1.6; color:#374151;">
-              ${order.full_name}<br/>
-              ${order.address}<br/>
-              ${order.city}<br/>
-              CP: ${order.postal_code}<br/>
-              Tel: ${order.phone}
+              ${esc(order.full_name)}<br/>
+              ${esc(order.address)}<br/>
+              ${esc(order.city)}<br/>
+              CP: ${esc(order.postal_code)}<br/>
+              Tel: ${esc(order.phone)}
             </p>
 
             <p style="margin-top:25px; font-size:14px; color:#6b7280;">
@@ -119,9 +138,15 @@ export async function sendOrderShippedEmail(orderId: string) {
       `,
     });
 
-    console.log("Correo profesional enviado ✅");
+    if (sendError) {
+      console.error("Resend rechazó el correo:", sendError);
+      return false;
+    }
 
+    console.log("Correo de envío enviado ✅");
+    return true;
   } catch (err) {
     console.error("Error enviando correo:", err);
+    return false;
   }
 }

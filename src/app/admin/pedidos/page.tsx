@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 export default function AdminPedidos() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -65,11 +60,25 @@ export default function AdminPedidos() {
     }
 
     if (newStatus === "enviado") {
-      await fetch("/api/send-shipped-email", {
+      // La ruta de correo exige sesión de administrador: se manda el token.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const res = await fetch("/api/send-shipped-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+        },
         body: JSON.stringify({ orderId }),
       });
+
+      if (!res.ok) {
+        alert(
+          "El pedido se marcó como enviado, pero el correo al cliente no pudo enviarse."
+        );
+      }
     }
 
     await fetchOrders();
@@ -157,6 +166,12 @@ export default function AdminPedidos() {
                 Total: <strong>${selectedOrder.total} MXN</strong>
               </p>
 
+              {selectedOrder.notes && (
+                <div className="border border-neutral-900 bg-neutral-50 rounded-2xl p-4 text-sm text-neutral-900">
+                  <strong>Atención:</strong> {selectedOrder.notes}
+                </div>
+              )}
+
               {/* Cliente */}
               <Section title="Cliente">
                 <p>{selectedOrder.full_name}</p>
@@ -191,7 +206,14 @@ export default function AdminPedidos() {
 
                       <div>
                         <p className="font-medium text-neutral-900">
-                          {item.product_variants?.products?.name}
+                          {item.product_name ||
+                            item.product_variants?.products?.name}
+                          {(item.variant_name ||
+                            item.product_variants?.model_name) &&
+                            ` (${
+                              item.variant_name ||
+                              item.product_variants?.model_name
+                            })`}
                         </p>
                         <p className="text-sm text-neutral-500">
                           Cantidad: {item.quantity}

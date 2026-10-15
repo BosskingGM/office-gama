@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [type, setType] = useState<"error" | "success" | "">("");
+  const [emailSent, setEmailSent] = useState(false);
   const router = useRouter();
 
   const showMessage = (msg: string, msgType: "error" | "success") => {
@@ -40,24 +41,66 @@ export default function RegisterPage() {
       return;
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        // El enlace del correo de confirmación regresa a esta misma tienda.
+        emailRedirectTo: `${window.location.origin}/login`,
+      },
     });
 
     if (error) {
       showMessage(error.message, "error");
-    } else {
-      showMessage("Cuenta creada correctamente", "success");
+      return;
+    }
 
-      setTimeout(() => {
-        router.push("/login");
-      }, 1000);
+    // Supabase no marca error si el correo ya existe; devuelve un usuario sin identidades.
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      showMessage("Este correo ya está registrado. Inicia sesión.", "error");
+      return;
+    }
+
+    if (data.session) {
+      // La confirmación por correo está desactivada: ya inició sesión.
+      router.push("/");
+      router.refresh();
+    } else {
+      setEmailSent(true);
     }
   };
 
   const passwordsMatch =
     confirmPassword.length > 0 && password === confirmPassword;
+
+  if (emailSent) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-[#faf9ff] px-6">
+        <div className="bg-white border border-neutral-200 p-10 rounded-3xl w-full max-w-md space-y-6 text-center">
+          <div className="mx-auto w-16 h-16 rounded-full bg-[#f3e8ff] flex items-center justify-center text-2xl">
+            ✉
+          </div>
+          <h1 className="text-2xl font-bold text-neutral-900">
+            Revisa tu correo
+          </h1>
+          <p className="text-neutral-600 text-sm leading-relaxed">
+            Te enviamos un enlace de confirmación a{" "}
+            <strong className="text-neutral-900 break-all">{email}</strong>.
+            Ábrelo para activar tu cuenta y después inicia sesión.
+          </p>
+          <p className="text-neutral-400 text-xs">
+            Si no lo ves en unos minutos, revisa tu carpeta de spam.
+          </p>
+          <button
+            onClick={() => router.push("/login")}
+            className="w-full bg-[#d6a8ff] text-black py-4 rounded-2xl font-semibold hover:opacity-90 transition"
+          >
+            Ir a iniciar sesión
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-[#faf9ff] px-6 relative">

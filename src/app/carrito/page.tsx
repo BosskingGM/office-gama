@@ -4,6 +4,7 @@ import { useCart } from "@/context/CartContext";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { SHIPPING_OPTIONS, type ShippingType } from "@/lib/shipping";
 
 export default function CarritoPage() {
   const {
@@ -24,7 +25,7 @@ export default function CarritoPage() {
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [postalCode, setPostalCode] = useState("");
-  const [shippingType, setShippingType] = useState("pickup");
+  const [shippingType, setShippingType] = useState<ShippingType>("pickup");
 
   const [message, setMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
@@ -50,12 +51,8 @@ export default function CarritoPage() {
     0
   );
 
-  const shippingCost =
-    shippingType === "pickup"
-      ? 0
-      : shippingType === "local"
-      ? 50
-      : 160;
+  // Solo para mostrar. El servidor vuelve a calcular el costo real al cobrar.
+  const shippingCost = SHIPPING_OPTIONS[shippingType].cost;
 
   const finalTotal = productsTotal + shippingCost;
 
@@ -73,16 +70,29 @@ export default function CarritoPage() {
     try {
       setLoading(true);
 
+      // El servidor identifica al comprador con este token y calcula precios y
+      // envío por su cuenta: aquí solo se manda qué variante y cuántas piezas.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.push("/login");
+        return;
+      }
+
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
-          items: cart,
-          user, // 🔥 ahora mandamos el objeto completo
-          shipping: {
-            shipping_type: shippingType,
-            shipping_cost: shippingCost,
-          },
+          items: cart.map((item) => ({
+            variant_id: item.variant_id,
+            quantity: item.quantity,
+          })),
+          shipping: { shipping_type: shippingType },
           customer: {
             full_name: fullName,
             phone,
@@ -93,12 +103,12 @@ export default function CarritoPage() {
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
-      if (data.url) {
+      if (response.ok && data.url) {
         window.location.href = data.url;
       } else {
-        showMessage("Error al crear sesión de pago");
+        showMessage(data.error || "Error al crear sesión de pago");
       }
     } catch (error) {
       console.error(error);
@@ -223,13 +233,15 @@ export default function CarritoPage() {
 
               <select
                 value={shippingType}
-                onChange={(e) => setShippingType(e.target.value)}
+                onChange={(e) => setShippingType(e.target.value as ShippingType)}
                 className="w-full border border-neutral-300 px-5 py-3 rounded-2xl"
               >
-                <option value="pickup">Recoger en tienda (Gratis)</option>
-                <option value="local">Entrega local ($50)</option>
+                <option value="pickup">{SHIPPING_OPTIONS.pickup.label} (Gratis)</option>
+                <option value="local">
+                  {SHIPPING_OPTIONS.local.label} (${SHIPPING_OPTIONS.local.cost})
+                </option>
                 <option value="paqueteria">
-                  Paquetería nacional ($160)
+                  {SHIPPING_OPTIONS.paqueteria.label} (${SHIPPING_OPTIONS.paqueteria.cost})
                 </option>
               </select>
             </div>

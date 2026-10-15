@@ -19,7 +19,7 @@ export default function LoginPage() {
     setTimeout(() => {
       setMessage("");
       setType("");
-    }, 3000);
+    }, 5000);
   };
 
   const handleLogin = async () => {
@@ -34,7 +34,14 @@ export default function LoginPage() {
     });
 
     if (error) {
-      showMessage("Correo o contraseña incorrectos", "error");
+      if (/email not confirmed/i.test(error.message)) {
+        showMessage(
+          "Debes confirmar tu correo. Revisa tu bandeja de entrada y spam.",
+          "error"
+        );
+      } else {
+        showMessage("Correo o contraseña incorrectos", "error");
+      }
     } else {
       showMessage("Bienvenido de nuevo", "success");
 
