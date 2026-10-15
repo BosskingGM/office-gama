@@ -1,196 +1,106 @@
-"use client";
+import { createClient } from "@supabase/supabase-js";
+import { Package, ShieldCheck, Truck } from "lucide-react";
+import Catalog from "@/components/Catalog";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import ProductCard from "@/components/ProductCard";
+// La portada se genera en el servidor y se refresca sola cada minuto:
+// el catálogo llega ya en el HTML (sin parpadeo y visible para Google).
+export const revalidate = 60;
 
-export default function HomePage() {
-  const [products, setProducts] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const PRODUCTS_PER_PAGE = 8;
-
-const categories = [
-  "Sacapuntas","Libretas","Washi Tapes","Stickers","Tintas","Sellos","Post It",
-  "Plumones","Folders","Plumas","Pegamento","Extras","Marca Textos","Cutters",
-  "Lapiceras","Crayolas","Lacre","Gises","Colores","Correctores",
-  "Juegos Geométricos","Liquidación",
-].sort((a, b) => a.localeCompare(b, "es"));
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from("products")
-      .select(`
-        id,
-        name,
-        price,
-        category,
-        product_variants ( id, image_url )
-      `);
-
-    if (!error && data) setProducts(data);
-  };
-
-  const filteredProducts = products.filter((product) => {
-    const matchesCategory =
-      !selectedCategory || product.category === selectedCategory;
-
-    const matchesSearch =
-      search.trim() === "" ||
-      product.name.toLowerCase().includes(search.toLowerCase());
-
-    return matchesCategory && matchesSearch;
-  });
-
-  const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
-
-  const paginatedProducts = filteredProducts.slice(
-    (currentPage - 1) * PRODUCTS_PER_PAGE,
-    currentPage * PRODUCTS_PER_PAGE
+async function getProducts() {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
   );
 
+  const { data, error } = await supabase
+    .from("products")
+    .select(
+      `
+      id,
+      name,
+      price,
+      category,
+      product_variants ( id, image_url, model_name, stock )
+    `
+    );
+
+  if (error) {
+    console.error("Error al cargar productos:", error.message);
+    return { products: [], failed: true };
+  }
+  return { products: data ?? [], failed: false };
+}
+
+const PERKS = [
+  { icon: Truck, text: "Envíos a todo México" },
+  { icon: Package, text: "Recoge gratis en tienda" },
+  { icon: ShieldCheck, text: "Pago seguro con tarjeta" },
+];
+
+export default async function HomePage() {
+  const { products, failed } = await getProducts();
+
   return (
-    <div className="min-h-screen bg-[#faf9ff]">
-
+    <div className="space-y-10 sm:space-y-14">
       {/* HERO */}
-      <div className="py-6 sm:py-10">
-        <div className="max-w-3xl mx-auto px-5 text-center space-y-4">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-neutral-900 leading-snug">
-            Papelería Importada
-            <span className="block text-[#d6a8ff] font-semibold">
-              Diseño que inspira
-            </span>
-          </h1>
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-brand-soft via-white to-peach-soft border border-line px-6 py-12 sm:px-12 sm:py-20 text-center">
+        <div
+          aria-hidden="true"
+          className="absolute -top-16 -left-16 w-56 h-56 rounded-full bg-brand/30 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -bottom-20 -right-10 w-64 h-64 rounded-full bg-peach/60 blur-3xl"
+        />
 
-          <p className="text-xs sm:text-sm text-neutral-500 max-w-md mx-auto">
-            Diseños únicos y artículos cuidadosamente seleccionados.
+        <div className="relative max-w-2xl mx-auto space-y-5 animate-fade-up">
+          <p className="inline-block text-xs sm:text-sm font-semibold tracking-wide uppercase text-brand-strong bg-white/80 px-3.5 py-1 rounded-full border border-line">
+            Papelería importada
           </p>
 
-          <button
-            onClick={() =>
-              window.scrollTo({ top: 700, behavior: "smooth" })
-            }
-            className="bg-[#d6a8ff] hover:opacity-90 text-black px-5 py-1.5 rounded-full text-xs font-medium transition"
-          >
-            Explorar catálogo
-          </button>
-        </div>
-      </div>
+          <h1 className="text-3xl sm:text-5xl font-extrabold leading-[1.1]">
+            Diseños que hacen
+            <span className="block text-brand-strong">tu escritorio feliz</span>
+          </h1>
 
-      {/* CATEGORÍAS */}
-      <div className="max-w-7xl mx-auto px-6 mt-10 mb-8">
-        <h2 className="text-base font-semibold text-neutral-900 mb-4">
-          Categorías
-        </h2>
+          <p className="text-neutral-600 text-base sm:text-lg max-w-lg mx-auto">
+            Libretas, plumas, stickers, washi tapes y mucho más, elegidos uno
+            por uno para ti.
+          </p>
 
-        <div className="flex gap-3 overflow-x-auto pb-3">
-          {categories.map((cat, index) => {
-            const isActive = selectedCategory === cat;
-
-            return (
-              <div
-                key={index}
-                onClick={() => {
-                  setSelectedCategory(isActive ? null : cat);
-                  setCurrentPage(1);
-                }}
-                className={`
-                  min-w-max
-                  px-4
-                  py-1.5
-                  rounded-full
-                  text-xs
-                  font-medium
-                  cursor-pointer
-                  whitespace-nowrap
-                  border
-                  transition
-                  ${
-                    isActive
-                      ? "bg-[#d6a8ff] text-black border-[#d6a8ff]"
-                      : "bg-white text-neutral-600 border-neutral-200 hover:border-[#d6a8ff]"
-                  }
-                `}
-              >
-                {cat}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* CONTENIDO */}
-      <div className="max-w-7xl mx-auto px-6 pb-20">
-
-        <div className="mb-8 flex justify-center sm:justify-start">
-          <input
-            type="text"
-            placeholder="Buscar productos..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="
-              w-full
-              sm:w-80
-              border
-              border-neutral-300
-              rounded-full
-              px-4
-              py-2
-              text-sm
-              bg-white
-              focus:outline-none
-              focus:ring-1
-              focus:ring-[#d6a8ff]
-              transition
-            "
-          />
-        </div>
-
-        {/* GRID */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {paginatedProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-
-        {/* PAGINACIÓN MINIMAL */}
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-4 mt-12">
-
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((prev) => prev - 1)}
-              className="text-sm text-neutral-500 disabled:opacity-30 hover:text-neutral-900 transition"
-            >
-              ← Anterior
-            </button>
-
-            <span className="text-sm text-neutral-600">
-              {currentPage} / {totalPages}
-            </span>
-
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((prev) => prev + 1)}
-              className="text-sm text-neutral-500 disabled:opacity-30 hover:text-neutral-900 transition"
-            >
-              Siguiente →
-            </button>
-
+          <div className="pt-2">
+            <a href="#catalogo" className="btn-primary text-base px-8 py-3.5">
+              Ver catálogo
+            </a>
           </div>
+
+          <ul className="pt-6 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-neutral-600">
+            {PERKS.map(({ icon: Icon, text }) => (
+              <li key={text} className="flex items-center gap-2">
+                <Icon size={16} className="text-brand-strong" />
+                {text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* CATÁLOGO */}
+      <section id="catalogo" className="scroll-mt-24">
+        {failed ? (
+          <div className="card p-10 text-center space-y-2">
+            <p className="font-semibold text-lg">
+              No pudimos cargar los productos
+            </p>
+            <p className="text-sm text-muted">
+              Intenta de nuevo en unos minutos.
+            </p>
+          </div>
+        ) : (
+          <Catalog products={products as any[]} />
         )}
-
-      </div>
-
+      </section>
     </div>
   );
 }

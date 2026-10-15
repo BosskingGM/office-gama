@@ -1,134 +1,290 @@
 @import "tailwindcss";
 
 /* =========================
-   🎨 SISTEMA DE COLOR
+   SISTEMA DE COLOR
+   Lila de la marca + durazno de la mascota.
+   Regla de contraste: el lila claro (--primary) sirve de FONDO con texto
+   oscuro; para texto o iconos sobre blanco usa --accent-strong.
 ========================= */
 
 :root {
   --background: #ffffff;
   --background-soft: #faf9ff;
+  --surface: #ffffff;
 
-  --foreground: #111111;
-  --text-secondary: #4b5563;
-  --text-muted: #6b7280;
+  --foreground: #1a1523;
+  --text-secondary: #4b4658;
+  --text-muted: #6e6879;
 
   --primary: #d6a8ff;
-  --primary-hover: #c084fc;
+  --primary-hover: #c58bfb;
   --primary-soft: #f3e8ff;
+  --accent-strong: #7e22ce; /* texto/enlaces lila legibles sobre blanco */
 
-  --border-soft: #e5e7eb;
+  --peach: #ffd9c7;
+  --peach-soft: #fff1ea;
+
+  --success: #15803d;
+  --danger: #dc2626;
+
+  --border-soft: #e9e5f0;
+
+  --radius-card: 1.25rem;
+  --shadow-card: 0 1px 2px rgba(26, 21, 35, 0.04),
+    0 8px 24px rgba(126, 34, 206, 0.06);
+  --shadow-lift: 0 2px 4px rgba(26, 21, 35, 0.05),
+    0 18px 40px rgba(126, 34, 206, 0.14);
+}
+
+/* Tokens disponibles como clases de Tailwind:
+   bg-brand, bg-brand-soft, text-brand-strong, bg-peach, border-line, etc. */
+@theme inline {
+  --color-brand: var(--primary);
+  --color-brand-hover: var(--primary-hover);
+  --color-brand-soft: var(--primary-soft);
+  --color-brand-strong: var(--accent-strong);
+  --color-peach: var(--peach);
+  --color-peach-soft: var(--peach-soft);
+  --color-ink: var(--foreground);
+  --color-soft: var(--background-soft);
+  --color-line: var(--border-soft);
+  --color-ok: var(--success);
+  --color-danger: var(--danger);
+
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-geist-sans), system-ui,
+    sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 /* =========================
-   🌙 MODO OSCURO DESACTIVADO
+   BASE GLOBAL
 ========================= */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #ffffff;
-    --foreground: #111111;
-  }
+html {
+  scroll-behavior: smooth;
+  color-scheme: light; /* la tienda es solo clara */
 }
-
-/* =========================
-   🧠 BASE GLOBAL
-========================= */
 
 body {
-  background: var(--background);
+  background: var(--background-soft);
   color: var(--foreground);
-  font-family: var(--font-sans, Arial, Helvetica, sans-serif);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* =========================
-   🎒 TEXTURA ESCOLAR PREMIUM
-========================= */
-
-.school-pattern {
-  background-color: var(--background-soft);
-  background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 150 L80 50 L100 60 L40 160 Z' fill='%23d6a8ff' opacity='0.05'/%3E%3C/svg%3E");
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
-
-/* =========================
-   ✨ SELECCIÓN DE TEXTO
-========================= */
 
 ::selection {
   background: var(--primary);
   color: #111;
 }
 
+/* Foco visible para teclado (accesibilidad) */
+:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 /* =========================
-   🖱 SCROLL ELEGANTE
+   TEXTURA ESCOLAR
+========================= */
+
+.school-pattern {
+  background-color: var(--background-soft);
+  background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 150 L80 50 L100 60 L40 160 Z' fill='%23d6a8ff' opacity='0.07'/%3E%3Ccircle cx='150' cy='40' r='6' fill='%23ffd9c7' opacity='0.35'/%3E%3C/svg%3E");
+}
+
+/* =========================
+   SCROLL
 ========================= */
 
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
   background: var(--primary-soft);
   border-radius: 10px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
 }
 
+/* Oculta la barra en carruseles/filas de chips */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* =========================
-   🔘 BOTONES BASE
+   BOTONES
 ========================= */
+
+.btn-primary,
+.btn-outline,
+.btn-dark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  padding: 0.7rem 1.4rem;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease,
+    border-color 0.2s ease;
+  cursor: pointer;
+}
+.btn-primary:active,
+.btn-outline:active,
+.btn-dark:active {
+  transform: scale(0.98);
+}
+.btn-primary:disabled,
+.btn-outline:disabled,
+.btn-dark:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .btn-primary {
   background: var(--primary);
-  color: #111;
-  transition: all 0.2s ease;
+  color: #1a1523;
+  box-shadow: 0 4px 14px rgba(198, 139, 251, 0.35);
 }
-
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background: var(--primary-hover);
 }
 
-.btn-outline {
-  border: 1px solid var(--primary);
-  color: var(--primary);
-  transition: all 0.2s ease;
+.btn-dark {
+  background: var(--foreground);
+  color: #fff;
+}
+.btn-dark:hover:not(:disabled) {
+  background: #2f2740;
 }
 
-.btn-outline:hover {
+.btn-outline {
+  border: 1.5px solid var(--border-soft);
+  background: #fff;
+  color: var(--foreground);
+}
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--primary);
   background: var(--primary-soft);
 }
 
 /* =========================
-   📦 CARDS PREMIUM
+   TARJETAS
 ========================= */
 
 .card {
-  background: #ffffff;
+  background: var(--surface);
   border: 1px solid var(--border-soft);
-  border-radius: 1rem;
-  transition: all 0.25s ease;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+.card-hover:hover {
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-3px);
 }
 
-.card:hover {
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
-  transform: translateY(-2px);
+/* Campos de formulario */
+.field {
+  width: 100%;
+  background: #fff;
+  border: 1.5px solid var(--border-soft);
+  border-radius: 0.9rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.field:focus {
+  outline: none;
+  border-color: var(--primary-hover);
+  box-shadow: 0 0 0 4px var(--primary-soft);
 }
 
 /* =========================
-   🧾 TEXTO UTILIDADES
+   CARGA (skeleton) Y ANIMACIONES
+========================= */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #f1edf7 25%,
+    #faf7ff 50%,
+    #f1edf7 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 0.75rem;
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fade-up 0.45s ease both;
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =========================
+   TEXTO UTILIDADES (compatibilidad)
 ========================= */
 
 .text-secondary {
   color: var(--text-secondary);
 }
-
 .text-muted {
   color: var(--text-muted);
 }

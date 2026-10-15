@@ -1,212 +1,131 @@
-"use client";
+import { cache } from "react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
+import ProductDetail from "@/components/ProductDetail";
+import ProductCard from "@/components/ProductCard";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { useParams, useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
+// Se genera en el servidor y se refresca cada minuto (SEO + carga rápida).
+// El stock real siempre lo vuelve a validar el servidor al pagar.
+export const revalidate = 60;
 
-export default function ProductPage() {
-  const params = useParams();
-  const router = useRouter();
-  const id = Array.isArray(params.id)
-    ? params.id[0]
-    : params.id;
+const db = () =>
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
 
-  const { addToCart } = useCart();
+// cache(): el título y la página comparten una sola consulta
+const getProduct = cache(async (id: string) => {
+  const supabase = db();
 
-  const [product, setProduct] = useState<any>(null);
-  const [variants, setVariants] = useState<any[]>([]);
-  const [selectedVariant, setSelectedVariant] =
-    useState<any>(null);
-  const [quantity, setQuantity] = useState(1);
-  const [added, setAdded] = useState(false);
+  const { data: product, error } = await supabase
+    .from("products")
+    .select("id, name, price, category, description")
+    .eq("id", id)
+    .maybeSingle();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const { data: productData } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .single();
+  if (error || !product) return null;
 
-      const { data: variantsData } = await supabase
-        .from("product_variants")
-        .select("*")
-        .eq("product_id", id);
+  const { data: variants } = await supabase
+    .from("product_variants")
+    .select("id, model_name, image_url, stock")
+    .eq("product_id", id);
 
-      setProduct(productData);
-      setVariants(variantsData || []);
-      setSelectedVariant(variantsData?.[0] || null);
-      setQuantity(1);
-    };
+  return { product, variants: variants ?? [] };
+});
 
-    fetchData();
-  }, [id]);
+async function getRelated(category: string | null, excludeId: string) {
+  if (!category) return [];
+  const { data } = await db()
+    .from("products")
+    .select("id, name, price, category, product_variants ( id, image_url, model_name, stock )")
+    .eq("category", category)
+    .neq("id", excludeId)
+    .limit(4);
+  return data ?? [];
+}
 
-  // 🔥 Ajustar cantidad automáticamente cuando cambia variante
-  useEffect(() => {
-    if (!selectedVariant) return;
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const found = await getProduct(id);
+  if (!found) return { title: "Producto no encontrado" };
 
-    if (selectedVariant.stock === 0) {
-      setQuantity(1);
-      return;
-    }
+  const { product, variants } = found;
+  const image = variants.find((v) => v.image_url)?.image_url;
+  const description =
+    product.description?.slice(0, 160) ||
+    `${product.name} en Office GaMa. Papelería importada con envíos a todo México.`;
 
-    if (quantity > selectedVariant.stock) {
-      setQuantity(selectedVariant.stock);
-    }
-  }, [selectedVariant]);
-
-  if (!product || !selectedVariant) return null;
-
-  const handleAddToCart = () => {
-    if (!selectedVariant) return;
-    if (selectedVariant.stock === 0) return;
-    if (quantity > selectedVariant.stock) return;
-
-    addToCart({
-      product_id: product.id,
-      variant_id: selectedVariant.id,
-      name: product.name,
-      model_name: selectedVariant.model_name,
-      price: product.price,
-      quantity: quantity,
-      stock: selectedVariant.stock,
-      image_url: selectedVariant.image_url,
-    });
-
-    setAdded(true);
-    setQuantity(1);
-
-    setTimeout(() => {
-      setAdded(false);
-    }, 2000);
+  return {
+    title: product.name,
+    description,
+    openGraph: {
+      title: product.name,
+      description,
+      ...(image ? { images: [{ url: image }] } : {}),
+    },
   };
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const found = await getProduct(id);
+  if (!found) notFound();
+
+  const { product, variants } = found;
+  const related = await getRelated(product.category, product.id);
 
   return (
-    <div className="min-h-screen bg-[#faf9ff] px-4 py-10">
-      <div className="max-w-6xl mx-auto">
+    <div className="space-y-12">
+      {/* Migas de pan */}
+      <nav aria-label="Ruta" className="text-sm text-muted flex flex-wrap gap-x-2 gap-y-1">
+        <Link href="/" className="hover:text-brand-strong transition">
+          Inicio
+        </Link>
+        <span aria-hidden="true">/</span>
+        {product.category && (
+          <>
+            <span>{product.category}</span>
+            <span aria-hidden="true">/</span>
+          </>
+        )}
+        <span className="text-ink font-medium line-clamp-1">{product.name}</span>
+      </nav>
 
-        <button
-          onClick={() => router.back()}
-          className="mb-8 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition flex items-center gap-2"
-        >
-          ← Volver al catálogo
-        </button>
+      <ProductDetail
+        product={{
+          id: product.id,
+          name: product.name,
+          price: Number(product.price),
+          category: product.category,
+          description: product.description,
+        }}
+        variants={variants}
+      />
 
-        <div className="bg-white rounded-3xl border border-neutral-200 p-6 sm:p-10">
-          <div className="grid md:grid-cols-2 gap-12 items-start">
-
-            {/* IMAGEN */}
-            <div className="flex justify-center">
-              <div className="w-4/5 sm:w-full rounded-2xl overflow-hidden border border-neutral-200">
-                <img
-                  src={selectedVariant.image_url}
-                  className="w-full object-cover transition duration-700 hover:scale-105"
-                />
-              </div>
-            </div>
-
-            {/* CONTENIDO */}
-            <div className="space-y-6">
-
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-bold text-neutral-900">
-                  {product.name}
-                </h1>
-
-                {product.category && (
-                  <span className="inline-block mt-3 bg-[#f3e8ff] text-neutral-800 text-xs px-4 py-1.5 rounded-full font-medium">
-                    {product.category}
-                  </span>
-                )}
-              </div>
-
-              <p className="text-3xl font-semibold text-neutral-900">
-                ${(product.price * quantity).toFixed(2)} MXN
-              </p>
-
-              {product.description && (
-                <p className="text-neutral-600 leading-relaxed text-sm sm:text-base">
-                  {product.description}
-                </p>
-              )}
-
-              {/* VARIANTES */}
-              <div>
-                <p className="font-semibold text-sm text-neutral-900 mb-3">
-                  Variantes
-                </p>
-
-                <div className="flex gap-3 flex-wrap">
-                  {variants.map((variant) => (
-                    <button
-                      key={variant.id}
-                      onClick={() => {
-                        setSelectedVariant(variant);
-                        setQuantity(1); // 🔥 reset inmediato
-                      }}
-                      className={`px-4 py-2 text-sm rounded-xl border transition ${
-                        selectedVariant.id === variant.id
-                          ? "bg-[#d6a8ff] text-black border-[#d6a8ff]"
-                          : "bg-white text-neutral-800 border-neutral-300 hover:border-[#d6a8ff]"
-                      }`}
-                    >
-                      {variant.model_name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* CANTIDAD */}
-              <div className="flex items-center gap-4 pt-2">
-                <button
-                  onClick={() =>
-                    setQuantity((prev) => (prev > 1 ? prev - 1 : 1))
-                  }
-                  className="border border-neutral-300 px-4 py-2 rounded-xl text-neutral-800 hover:bg-[#f3e8ff] transition"
-                >
-                  −
-                </button>
-
-                <span className="text-lg font-semibold text-neutral-900 w-8 text-center">
-                  {quantity}
-                </span>
-
-                <button
-                  onClick={() =>
-                    setQuantity((prev) =>
-                      prev < selectedVariant.stock ? prev + 1 : prev
-                    )
-                  }
-                  disabled={quantity >= selectedVariant.stock}
-                  className="border border-neutral-300 px-4 py-2 rounded-xl text-neutral-800 hover:bg-[#f3e8ff] transition disabled:opacity-40"
-                >
-                  +
-                </button>
-              </div>
-
-              {/* BOTÓN AGREGAR */}
-              <button
-                onClick={handleAddToCart}
-                disabled={
-                  added ||
-                  selectedVariant.stock === 0 ||
-                  quantity === 0
-                }
-                className={`mt-4 px-6 py-4 rounded-2xl w-full font-semibold transition ${
-                  added
-                    ? "bg-neutral-900 text-white"
-                    : "bg-[#d6a8ff] text-black hover:opacity-90"
-                }`}
-              >
-                {added ? "Producto agregado" : "Agregar al carrito"}
-              </button>
-
-            </div>
+      {related.length > 0 && (
+        <section aria-labelledby="relacionados">
+          <h2 id="relacionados" className="text-xl sm:text-2xl font-bold mb-5">
+            También te puede gustar
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-5">
+            {related.map((p: any) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
           </div>
-        </div>
-      </div>
+        </section>
+      )}
     </div>
   );
 }

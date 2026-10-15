@@ -1,69 +1,159 @@
 "use client";
 
-import { useCart } from "@/context/CartContext";
-import { supabase } from "@/lib/supabase";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { SHIPPING_OPTIONS, type ShippingType } from "@/lib/shipping";
+import type { User } from "@supabase/supabase-js";
+import {
+  AlertCircle,
+  Lock,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Trash2,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useCart } from "@/context/CartContext";
+import {
+  SHIPPING_OPTIONS,
+  type ShippingType,
+} from "@/lib/shipping";
+
+const money = (n: number) =>
+  n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+
+// Para "Recoger en tienda" el pedido se guarda con la dirección de la tienda
+// (el servidor exige dirección, ciudad y código postal en todos los pedidos).
+const STORE = {
+  address: "Calle Chalco 26, Santa Bárbara (recoger en tienda)",
+  city: "Ixtapaluca",
+  postal_code: "56538",
+};
+
+const SHIPPING_NOTES: Record<ShippingType, string> = {
+  pickup: "Calle Chalco 26, Santa Bárbara, Ixtapaluca",
+  local: "Costo fijo",
+  paqueteria: "Envío a todo México",
+};
+
+const FORM_KEY = "officegama_checkout_form";
+
+type FormState = {
+  full_name: string;
+  phone: string;
+  address: string;
+  city: string;
+  postal_code: string;
+};
+type Errors = Partial<Record<keyof FormState, string>>;
+
+const EMPTY: FormState = {
+  full_name: "",
+  phone: "",
+  address: "",
+  city: "",
+  postal_code: "",
+};
+
+// Mismas reglas que el servidor (create-checkout-session)
+function validate(f: FormState, needsAddress: boolean): Errors {
+  const e: Errors = {};
+  if (!f.full_name.trim()) e.full_name = "Escribe tu nombre completo";
+  if (f.phone.replace(/\D/g, "").length < 10)
+    e.phone = "Escribe un teléfono de 10 dígitos";
+  if (needsAddress) {
+    if (!f.address.trim()) e.address = "Escribe tu dirección";
+    if (!f.city.trim()) e.city = "Escribe tu ciudad";
+    if (!/^\d{5}$/.test(f.postal_code))
+      e.postal_code = "El código postal tiene 5 dígitos";
+  }
+  return e;
+}
 
 export default function CarritoPage() {
   const {
     cart,
+    count,
+    subtotal,
+    hydrated,
     removeFromCart,
-    clearCart,
     increaseQuantity,
     decreaseQuantity,
+    syncCart,
   } = useCart();
-
   const router = useRouter();
 
-  const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
-
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [postalCode, setPostalCode] = useState("");
+  const [user, setUser] = useState<User | null>(null);
+  const [form, setForm] = useState<FormState>(EMPTY);
+  const [errors, setErrors] = useState<Errors>({});
   const [shippingType, setShippingType] = useState<ShippingType>("pickup");
+  const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  const [message, setMessage] = useState("");
-  const [showToast, setShowToast] = useState(false);
+  const needsAddress = shippingType !== "pickup";
+  const shippingCost = SHIPPING_OPTIONS[shippingType].cost; // solo informativo
+  const total = subtotal + shippingCost;
 
-  const showMessage = (msg: string) => {
-    setMessage(msg);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
-  };
-
+  /* Sesión */
   useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    getUser();
+    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
   }, []);
 
-  const productsTotal = cart.reduce(
-    (acc, item) => acc + item.price * item.quantity,
-    0
-  );
+  /* Datos de envío recordados en este navegador */
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(FORM_KEY);
+      if (saved) setForm({ ...EMPTY, ...JSON.parse(saved) });
+    } catch {
+      /* sin datos guardados */
+    }
+  }, []);
 
-  // Solo para mostrar. El servidor vuelve a calcular el costo real al cobrar.
-  const shippingCost = SHIPPING_OPTIONS[shippingType].cost;
+  useEffect(() => {
+    try {
+      localStorage.setItem(FORM_KEY, JSON.stringify(form));
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  }, [form]);
 
-  const finalTotal = productsTotal + shippingCost;
+  /* Al entrar, revisa precios y existencias una sola vez */
+  const syncRef = useRef(syncCart);
+  syncRef.current = syncCart;
+  const synced = useRef(false);
+  useEffect(() => {
+    if (!hydrated || synced.current) return;
+    synced.current = true;
+    syncRef.current().then(({ removed, adjusted }) => {
+      if (removed.length)
+        setNotice(
+          `Ya no está disponible: ${removed.join(", ")}. Lo quitamos de tu carrito.`
+        );
+      else if (adjusted.length)
+        setNotice(`Actualizamos precio o existencias de: ${adjusted.join(", ")}.`);
+    });
+  }, [hydrated]);
+
+  const setField = (key: keyof FormState, value: string) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
+  };
 
   const handleCheckout = async () => {
+    setServerError("");
+
     if (!user) {
-      router.push("/login");
+      router.push("/login?next=/carrito");
       return;
     }
 
-    if (!fullName || !phone || !address || !city || !postalCode) {
-      showMessage("Completa todos los datos de envío");
+    const found = validate(form, needsAddress);
+    setErrors(found);
+    if (Object.keys(found).length > 0) {
+      document
+        .getElementById("envio")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
@@ -77,9 +167,23 @@ export default function CarritoPage() {
       } = await supabase.auth.getSession();
 
       if (!session) {
-        router.push("/login");
+        router.push("/login?next=/carrito");
         return;
       }
+
+      const customer = needsAddress
+        ? {
+            full_name: form.full_name.trim(),
+            phone: form.phone.trim(),
+            address: form.address.trim(),
+            city: form.city.trim(),
+            postal_code: form.postal_code,
+          }
+        : {
+            full_name: form.full_name.trim(),
+            phone: form.phone.trim(),
+            ...STORE,
+          };
 
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
@@ -93,13 +197,7 @@ export default function CarritoPage() {
             quantity: item.quantity,
           })),
           shipping: { shipping_type: shippingType },
-          customer: {
-            full_name: fullName,
-            phone,
-            address,
-            city,
-            postal_code: postalCode,
-          },
+          customer,
         }),
       });
 
@@ -107,177 +205,370 @@ export default function CarritoPage() {
 
       if (response.ok && data.url) {
         window.location.href = data.url;
-      } else {
-        showMessage(data.error || "Error al crear sesión de pago");
+        return; // seguimos en "Procesando…" mientras redirige
       }
+      setServerError(data.error || "No pudimos iniciar el pago. Intenta de nuevo.");
     } catch (error) {
       console.error(error);
-      showMessage("Error inesperado");
-    } finally {
-      setLoading(false);
+      setServerError("Error inesperado. Revisa tu conexión e intenta de nuevo.");
     }
+    setLoading(false);
   };
 
-  if (cart.length === 0) {
+  /* Cargando el carrito guardado */
+  if (!hydrated) {
     return (
-      <div className="min-h-screen bg-[#faf9ff] flex items-center justify-center px-4">
-        <div className="bg-white border border-neutral-200 p-10 rounded-3xl text-center space-y-6 max-w-md w-full">
-          <h1 className="text-2xl font-bold text-neutral-900">
-            Tu carrito está vacío
-          </h1>
-          <button
-            onClick={() => router.push("/")}
-            className="bg-[#d6a8ff] text-black px-8 py-3 rounded-2xl font-semibold hover:opacity-90 transition"
-          >
-            Ir a la tienda
-          </button>
-        </div>
+      <div className="space-y-4 max-w-3xl mx-auto">
+        <div className="skeleton h-10 w-48" />
+        <div className="skeleton h-32" />
+        <div className="skeleton h-32" />
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[#faf9ff] relative">
-
-      {showToast && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-4 rounded-2xl shadow-2xl font-semibold z-50">
-          {message}
+  /* Carrito vacío */
+  if (cart.length === 0) {
+    return (
+      <div className="card p-10 sm:p-14 text-center space-y-5 max-w-md mx-auto">
+        <div className="mx-auto w-20 h-20 rounded-full bg-brand-soft grid place-items-center">
+          <ShoppingBag size={34} className="text-brand-strong" />
         </div>
+        <h1 className="text-2xl font-bold">Tu carrito está vacío</h1>
+        <p className="text-sm text-muted">
+          Cuando agregues productos, aparecerán aquí.
+        </p>
+        <Link href="/" className="btn-primary">
+          Ir a la tienda
+        </Link>
+      </div>
+    );
+  }
+
+  const fieldClass = (k: keyof FormState) =>
+    `field ${errors[k] ? "border-danger!" : ""}`;
+
+  const Err = ({ k }: { k: keyof FormState }) =>
+    errors[k] ? (
+      <p id={`err-${k}`} role="alert" className="text-xs text-danger mt-1.5">
+        {errors[k]}
+      </p>
+    ) : null;
+
+  return (
+    <div className="space-y-8">
+      <h1 className="text-3xl sm:text-4xl font-extrabold">
+        Tu carrito{" "}
+        <span className="text-lg font-medium text-muted">
+          ({count} {count === 1 ? "pieza" : "piezas"})
+        </span>
+      </h1>
+
+      {notice && (
+        <p
+          role="status"
+          className="text-sm bg-peach-soft border border-peach rounded-xl px-4 py-3"
+        >
+          {notice}
+        </p>
       )}
 
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        <h1 className="text-4xl font-bold text-neutral-900 mb-12">
-          Carrito
-        </h1>
+      <div className="grid lg:grid-cols-[1fr_380px] gap-8 items-start">
+        {/* COLUMNA IZQUIERDA */}
+        <div className="space-y-8">
+          {/* Productos */}
+          <section className="card divide-y divide-line">
+            {cart.map((item) => (
+              <div key={item.variant_id} className="p-4 sm:p-5 flex gap-4">
+                <Link
+                  href={`/producto/${item.product_id}`}
+                  className="w-24 h-24 rounded-xl overflow-hidden bg-brand-soft shrink-0 grid place-items-center"
+                >
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <ShoppingBag size={24} className="text-brand-strong" />
+                  )}
+                </Link>
 
-        <div className="space-y-6">
-          {cart.map((item) => (
-            <div
-              key={item.variant_id}
-              className="bg-white border border-neutral-200 rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center gap-6"
-            >
-              <div className="w-24 h-24 rounded-2xl overflow-hidden border border-neutral-200 bg-white shrink-0">
-                <img
-                  src={item.image_url || "/placeholder.png"}
-                  alt={item.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+                <div className="flex-1 min-w-0 flex flex-col">
+                  <div className="flex justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link
+                        href={`/producto/${item.product_id}`}
+                        className="font-semibold leading-5 line-clamp-2 hover:text-brand-strong transition"
+                      >
+                        {item.name}
+                      </Link>
+                      {item.model_name && (
+                        <p className="text-sm text-muted mt-0.5">
+                          {item.model_name}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => removeFromCart(item.variant_id)}
+                      aria-label={`Quitar ${item.name}`}
+                      className="text-neutral-400 hover:text-danger transition h-fit p-1"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
 
-              <div className="flex-1 space-y-2">
-                <p className="text-lg font-semibold text-neutral-900">
-                  {item.name}
-                </p>
-                <p className="text-neutral-600 text-sm">
-                  Modelo: {item.model_name}
-                </p>
-                <p className="text-lg font-semibold text-neutral-900">
-                  ${item.price} MXN
-                </p>
+                  <div className="flex items-center justify-between mt-auto pt-3">
+                    <div className="flex items-center border border-line rounded-full">
+                      <button
+                        onClick={() => decreaseQuantity(item.variant_id)}
+                        aria-label="Quitar una pieza"
+                        className="w-9 h-9 grid place-items-center rounded-full hover:bg-brand-soft transition"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span className="w-8 text-center font-semibold text-sm">
+                        {item.quantity}
+                      </span>
+                      <button
+                        onClick={() => increaseQuantity(item.variant_id)}
+                        disabled={item.quantity >= item.stock}
+                        aria-label="Agregar una pieza"
+                        className="w-9 h-9 grid place-items-center rounded-full hover:bg-brand-soft transition disabled:opacity-30 disabled:hover:bg-transparent"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold">
+                        {money(item.price * item.quantity)}
+                      </p>
+                      {item.quantity > 1 && (
+                        <p className="text-xs text-muted">
+                          {money(item.price)} c/u
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
-                <div className="flex items-center gap-4 pt-2">
-                  <button
-                    onClick={() => decreaseQuantity(item.variant_id)}
-                    className="w-10 h-10 rounded-xl border border-neutral-300"
-                  >
-                    −
-                  </button>
-
-                  <span className="text-lg font-semibold text-neutral-900">
-                    {item.quantity}
-                  </span>
-
-                  <button
-                    onClick={() => increaseQuantity(item.variant_id)}
-                    className="w-10 h-10 rounded-xl border border-neutral-300"
-                  >
-                    +
-                  </button>
+                  {item.quantity >= item.stock && (
+                    <p className="text-xs text-brand-strong mt-2">
+                      Máximo disponible: {item.stock}
+                    </p>
+                  )}
                 </div>
               </div>
+            ))}
+          </section>
 
-              <button
-                onClick={() => removeFromCart(item.variant_id)}
-                className="text-sm text-neutral-500 hover:text-red-600 transition"
-              >
-                Eliminar
-              </button>
+          {/* Envío */}
+          <section id="envio" className="card p-5 sm:p-7 space-y-6 scroll-mt-28">
+            <h2 className="text-xl font-bold">¿Cómo lo quieres recibir?</h2>
+
+            <div
+              role="radiogroup"
+              aria-label="Tipo de envío"
+              className="grid sm:grid-cols-3 gap-3"
+            >
+              {(Object.keys(SHIPPING_OPTIONS) as ShippingType[]).map((key) => {
+                const opt = SHIPPING_OPTIONS[key];
+                const active = shippingType === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setShippingType(key)}
+                    className={`text-left rounded-2xl border-2 p-4 transition ${
+                      active
+                        ? "border-brand-strong bg-brand-soft"
+                        : "border-line bg-white hover:border-brand"
+                    }`}
+                  >
+                    <p className="font-semibold text-sm">{opt.label}</p>
+                    <p className="font-bold mt-1">
+                      {opt.cost === 0 ? "Gratis" : money(opt.cost)}
+                    </p>
+                    <p className="text-xs text-muted mt-1 leading-4">
+                      {SHIPPING_NOTES[key]}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
-          ))}
+
+            <div>
+              <h3 className="font-semibold mb-4">
+                {needsAddress ? "Datos de entrega" : "Datos de contacto"}
+              </h3>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label htmlFor="full_name" className="text-sm font-medium mb-1.5 block">
+                    Nombre completo
+                  </label>
+                  <input
+                    id="full_name"
+                    autoComplete="name"
+                    value={form.full_name}
+                    onChange={(e) => setField("full_name", e.target.value)}
+                    aria-invalid={!!errors.full_name}
+                    aria-describedby={errors.full_name ? "err-full_name" : undefined}
+                    className={fieldClass("full_name")}
+                  />
+                  <Err k="full_name" />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label htmlFor="phone" className="text-sm font-medium mb-1.5 block">
+                    Teléfono
+                  </label>
+                  <input
+                    id="phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="10 dígitos"
+                    value={form.phone}
+                    onChange={(e) => setField("phone", e.target.value)}
+                    aria-invalid={!!errors.phone}
+                    aria-describedby={errors.phone ? "err-phone" : undefined}
+                    className={fieldClass("phone")}
+                  />
+                  <Err k="phone" />
+                </div>
+
+                {needsAddress ? (
+                  <>
+                    <div className="sm:col-span-2">
+                      <label htmlFor="address" className="text-sm font-medium mb-1.5 block">
+                        Dirección
+                      </label>
+                      <input
+                        id="address"
+                        autoComplete="street-address"
+                        placeholder="Calle, número, colonia"
+                        value={form.address}
+                        onChange={(e) => setField("address", e.target.value)}
+                        aria-invalid={!!errors.address}
+                        aria-describedby={errors.address ? "err-address" : undefined}
+                        className={fieldClass("address")}
+                      />
+                      <Err k="address" />
+                    </div>
+
+                    <div>
+                      <label htmlFor="city" className="text-sm font-medium mb-1.5 block">
+                        Ciudad
+                      </label>
+                      <input
+                        id="city"
+                        autoComplete="address-level2"
+                        value={form.city}
+                        onChange={(e) => setField("city", e.target.value)}
+                        aria-invalid={!!errors.city}
+                        aria-describedby={errors.city ? "err-city" : undefined}
+                        className={fieldClass("city")}
+                      />
+                      <Err k="city" />
+                    </div>
+
+                    <div>
+                      <label htmlFor="postal_code" className="text-sm font-medium mb-1.5 block">
+                        Código postal
+                      </label>
+                      <input
+                        id="postal_code"
+                        inputMode="numeric"
+                        autoComplete="postal-code"
+                        maxLength={5}
+                        value={form.postal_code}
+                        onChange={(e) =>
+                          setField("postal_code", e.target.value.replace(/\D/g, ""))
+                        }
+                        aria-invalid={!!errors.postal_code}
+                        aria-describedby={errors.postal_code ? "err-postal_code" : undefined}
+                        className={fieldClass("postal_code")}
+                      />
+                      <Err k="postal_code" />
+                    </div>
+                  </>
+                ) : (
+                  <p className="sm:col-span-2 text-sm text-neutral-600 bg-peach-soft border border-peach rounded-xl px-4 py-3">
+                    Recogerás tu pedido en {STORE.address.split(" (")[0]}, {STORE.city}.
+                    Te avisaremos cuando esté listo.
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mt-16">
+        {/* RESUMEN */}
+        <aside className="card p-5 sm:p-7 lg:sticky lg:top-28 space-y-5">
+          <h2 className="text-xl font-bold">Resumen</h2>
 
-          <div className="bg-white border border-neutral-200 p-8 rounded-3xl">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-8">
-              Información de envío
-            </h2>
-
-            <div className="space-y-6">
-              {[ 
-                { value: fullName, set: setFullName, placeholder: "Nombre completo" },
-                { value: phone, set: setPhone, placeholder: "Teléfono" },
-                { value: address, set: setAddress, placeholder: "Dirección" },
-                { value: city, set: setCity, placeholder: "Ciudad" },
-                { value: postalCode, set: setPostalCode, placeholder: "Código postal" }
-              ].map((field, i) => (
-                <input
-                  key={i}
-                  type="text"
-                  placeholder={field.placeholder}
-                  value={field.value}
-                  onChange={(e) => field.set(e.target.value)}
-                  className="w-full border border-neutral-300 px-5 py-3 rounded-2xl"
-                />
-              ))}
-
-              <select
-                value={shippingType}
-                onChange={(e) => setShippingType(e.target.value as ShippingType)}
-                className="w-full border border-neutral-300 px-5 py-3 rounded-2xl"
-              >
-                <option value="pickup">{SHIPPING_OPTIONS.pickup.label} (Gratis)</option>
-                <option value="local">
-                  {SHIPPING_OPTIONS.local.label} (${SHIPPING_OPTIONS.local.cost})
-                </option>
-                <option value="paqueteria">
-                  {SHIPPING_OPTIONS.paqueteria.label} (${SHIPPING_OPTIONS.paqueteria.cost})
-                </option>
-              </select>
+          <dl className="space-y-2.5 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-neutral-600">
+                Productos ({count})
+              </dt>
+              <dd className="font-medium">{money(subtotal)}</dd>
             </div>
+            <div className="flex justify-between">
+              <dt className="text-neutral-600">
+                Envío ({SHIPPING_OPTIONS[shippingType].label})
+              </dt>
+              <dd className="font-medium">
+                {shippingCost === 0 ? "Gratis" : money(shippingCost)}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="flex justify-between items-baseline border-t border-line pt-4">
+            <span className="font-semibold">Total</span>
+            <span className="text-3xl font-extrabold">{money(total)}</span>
           </div>
 
-          <div className="bg-white border border-neutral-200 p-8 rounded-3xl h-fit">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-8">
-              Resumen
-            </h2>
+          {!user && (
+            <p className="text-sm bg-brand-soft rounded-xl px-4 py-3">
+              Necesitas una cuenta para pagar. Tu carrito se conserva al
+              iniciar sesión.
+            </p>
+          )}
 
-            <div className="space-y-3 text-neutral-700">
-              <p>Productos: ${productsTotal} MXN</p>
-              <p>Envío: ${shippingCost} MXN</p>
+          {serverError && (
+            <div
+              role="alert"
+              className="flex gap-2 text-sm text-danger bg-red-50 border border-red-200 rounded-xl px-4 py-3"
+            >
+              <AlertCircle size={18} className="shrink-0 mt-0.5" />
+              <p>{serverError}</p>
             </div>
+          )}
 
-            <h3 className="text-3xl font-bold text-neutral-900 mt-8">
-              Total: ${finalTotal} MXN
-            </h3>
+          <button
+            onClick={handleCheckout}
+            disabled={loading}
+            className="btn-primary w-full text-base py-4"
+          >
+            {loading ? (
+              "Procesando…"
+            ) : user ? (
+              <>
+                <Lock size={18} /> Pagar con tarjeta
+              </>
+            ) : (
+              "Iniciar sesión para pagar"
+            )}
+          </button>
 
-            <button
-              onClick={handleCheckout}
-              disabled={loading}
-              className="mt-10 bg-[#d6a8ff] text-black font-semibold px-6 py-4 rounded-2xl w-full disabled:opacity-50"
-            >
-              {loading ? "Procesando..." : "Pagar con tarjeta"}
-            </button>
-
-            <button
-              onClick={clearCart}
-              className="mt-4 border border-neutral-300 text-neutral-700 px-6 py-4 rounded-2xl w-full"
-            >
-              Vaciar carrito
-            </button>
-          </div>
-
-        </div>
+          <p className="text-xs text-muted text-center">
+            Pago seguro con Stripe. No guardamos los datos de tu tarjeta.
+          </p>
+        </aside>
       </div>
     </div>
   );
