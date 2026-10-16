@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { SHIPPING_OPTIONS, type ShippingType } from "@/lib/shipping";
-import { STORE_ADDRESS_FULL } from "@/lib/store";
+import { STORE_ADDRESS_FULL, STORE_MAPS_URL } from "@/lib/store";
 import StatusBadge, { statusInfo } from "@/components/StatusBadge";
 
 const money = (n: number) =>
@@ -151,8 +151,15 @@ export default function PedidoPage() {
               </p>
             )}
             {pickup && (
-              <p className="text-muted">
-                {STORE_ADDRESS_FULL}
+              <p>
+                <a
+                  href={STORE_MAPS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-strong hover:underline"
+                >
+                  {STORE_ADDRESS_FULL}
+                </a>
               </p>
             )}
           </div>
