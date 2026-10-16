@@ -138,7 +138,10 @@ export function PromoSlide({ promo }: { promo: Promo }) {
   );
 }
 
-/* Carrusel de la portada: se desliza con el dedo y avanza solo cada 5 s. */
+// Cada cuántos milisegundos cambia de promoción (3000 = 3 segundos).
+const AUTO_MS = 3000;
+
+/* Carrusel de la portada: se desliza con el dedo y avanza solo cada 3 s. */
 export default function PromoBanner({ promos }: { promos: Promo[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const paused = useRef(false);
@@ -165,7 +168,7 @@ export default function PromoBanner({ promos }: { promos: Promo[] }) {
       if (!el || paused.current || el.clientWidth === 0) return;
       const cur = Math.round(el.scrollLeft / el.clientWidth);
       el.scrollTo({ left: ((cur + 1) % n) * el.clientWidth, behavior: "smooth" });
-    }, 5000);
+    }, AUTO_MS);
     return () => clearInterval(t);
   }, [n]);
 
@@ -178,7 +181,7 @@ export default function PromoBanner({ promos }: { promos: Promo[] }) {
       onMouseEnter={() => (paused.current = true)}
       onMouseLeave={() => (paused.current = false)}
       onTouchStart={() => (paused.current = true)}
-      onTouchEnd={() => setTimeout(() => (paused.current = false), 4000)}
+      onTouchEnd={() => setTimeout(() => (paused.current = false), 2000)}
     >
       <div
         ref={ref}
