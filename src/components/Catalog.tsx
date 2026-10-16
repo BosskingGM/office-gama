@@ -266,7 +266,7 @@ export default function Catalog({ products }: { products: Product[] }) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
             {shown.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}

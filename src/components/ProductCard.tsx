@@ -89,7 +89,7 @@ export default function ProductCard({ product }: { product: Product }) {
       {/* Imagen */}
       <Link
         href={href}
-        className="relative block w-full aspect-[4/3] sm:aspect-square bg-brand-soft overflow-hidden"
+        className="relative block w-full aspect-[5/4] sm:aspect-square bg-brand-soft overflow-hidden"
         onMouseEnter={startCycle}
         onMouseLeave={stopCycle}
         aria-label={`Ver ${product.name}`}
@@ -146,14 +146,14 @@ export default function ProductCard({ product }: { product: Product }) {
       </Link>
 
       {/* Contenido */}
-      <div className="flex flex-col flex-1 p-3.5 sm:p-4 gap-1">
+      <div className="flex flex-col flex-1 p-2.5 sm:p-3 gap-0.5">
         {product.category && (
           <p className="text-[11px] uppercase tracking-wide text-muted font-medium">
             {product.category}
           </p>
         )}
 
-        <h2 className="font-semibold text-[15px] leading-5 line-clamp-2 min-h-10">
+        <h2 className="font-semibold text-[13px] sm:text-sm leading-[18px] line-clamp-2 min-h-9">
           <Link href={href} className="hover:text-brand-strong transition">
             {product.name}
           </Link>
@@ -161,7 +161,7 @@ export default function ProductCard({ product }: { product: Product }) {
 
         <div className="flex items-end justify-between gap-2 mt-auto pt-2">
           <div>
-            <p className="text-lg font-bold leading-none">
+            <p className="text-base font-bold leading-none">
               {money(product.price)}
             </p>
             {variants.length > 1 && (
@@ -179,7 +179,7 @@ export default function ProductCard({ product }: { product: Product }) {
             <button
               onClick={handleQuickAdd}
               aria-label={`Agregar ${product.name} al carrito`}
-              className={`btn-primary p-0! w-10 h-10 shrink-0 ${
+              className={`btn-primary p-0! w-9 h-9 shrink-0 ${
                 added ? "bg-ok! text-white" : ""
               }`}
             >
