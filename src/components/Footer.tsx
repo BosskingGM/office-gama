@@ -59,7 +59,7 @@ export default function Footer() {
           <h4 className="font-bold mb-5">Contacto</h4>
           <div className="space-y-3.5 text-sm">
             <a
-              href="https://wa.me/52561806008"
+              href="https://wa.me/525618060088"
               target="_blank"
               rel="noopener noreferrer"
               className={linkClass}
