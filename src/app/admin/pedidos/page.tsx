@@ -40,12 +40,22 @@ type Order = {
   longitude: number | null;
   shipping_type: string | null;
   shipping_cost: number | string | null;
+  payment_method: string | null;
   order_items: Item[] | null;
 };
 
-type Filter = "pagado" | "enviado" | "entregado" | "cancelado" | "todos";
+type Filter =
+  | "revision"
+  | "contra_entrega"
+  | "pagado"
+  | "enviado"
+  | "entregado"
+  | "cancelado"
+  | "todos";
 
 const FILTERS: { id: Filter; label: string }[] = [
+  { id: "revision", label: "Por revisar" },
+  { id: "contra_entrega", label: "Pago al recoger" },
   { id: "pagado", label: "Por enviar" },
   { id: "enviado", label: "Enviados" },
   { id: "entregado", label: "Entregados" },
@@ -128,7 +138,7 @@ export default function AdminPedidos() {
       .select(
         `
         id, created_at, status, total, notes, full_name, user_email, phone,
-        address, city, postal_code, latitude, longitude, shipping_type, shipping_cost,
+        address, city, postal_code, latitude, longitude, shipping_type, shipping_cost, payment_method,
         order_items (
           id, quantity, price, product_name, variant_name,
           product_variants ( image_url, model_name, products ( name ) )
@@ -179,7 +189,7 @@ export default function AdminPedidos() {
 
   /* ---------- Acciones ---------- */
 
-  const sendShippedEmail = async (orderId: string) => {
+  const sendShippedEmail = async (orderId: string, kind?: "approved") => {
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -190,7 +200,7 @@ export default function AdminPedidos() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session?.access_token ?? ""}`,
       },
-      body: JSON.stringify({ orderId }),
+      body: JSON.stringify({ orderId, kind }),
     });
     return res.ok;
   };
@@ -234,6 +244,17 @@ export default function AdminPedidos() {
             ? "Pedido cancelado. Las piezas regresaron al inventario."
             : `Pedido marcado como ${newStatus}. Las piezas se descontaron de nuevo del inventario.`,
       };
+    }
+
+    // Transferencia aprobada: se avisa al cliente que ya recibimos su pago.
+    if (newStatus === "pagado" && statusOf(order) === "revision") {
+      const sent = await sendShippedEmail(order.id, "approved").catch(() => false);
+      result = sent
+        ? { kind: "ok", text: "Pago aprobado y se avisó al cliente por correo." }
+        : {
+            kind: "warn",
+            text: "Pago aprobado, pero el correo al cliente no se pudo enviar.",
+          };
     }
 
     if (withEmail) {
@@ -281,12 +302,14 @@ export default function AdminPedidos() {
       enviado: 0,
       entregado: 0,
       cancelado: 0,
+      revision: 0,
+      contra_entrega: 0,
       todos: orders.length,
     };
     for (const o of orders) {
       const s = statusOf(o);
-      if (s === "pagado" || s === "enviado" || s === "entregado" || s === "cancelado") {
-        c[s]++;
+      if (s in c && s !== "todos") {
+        c[s as Filter]++;
       }
     }
     return c;
@@ -523,6 +546,27 @@ export default function AdminPedidos() {
                 )}
               </Block>
 
+              <Block title="Pago">
+                <p className="font-medium">
+                  {selected.payment_method === "transferencia"
+                    ? "Transferencia bancaria"
+                    : selected.payment_method === "efectivo_tienda"
+                    ? "Pagar al recoger en tienda"
+                    : "Tarjeta (Stripe)"}
+                </p>
+                {statusOf(selected) === "revision" && (
+                  <p className="text-muted">
+                    Revisa que el depósito por {money(selected.total)} haya llegado y
+                    aprueba el pago. Las piezas ya están apartadas.
+                  </p>
+                )}
+                {statusOf(selected) === "contra_entrega" && (
+                  <p className="text-muted">
+                    Cobra {money(selected.total)} al entregar. Las piezas ya están apartadas.
+                  </p>
+                )}
+              </Block>
+
               <Block title="Entrega">
                 <p className="font-medium">{shippingLabel(selected)}</p>
                 {isPickup(selected) ? (
@@ -623,7 +667,11 @@ export default function AdminPedidos() {
                     </dd>
                   </div>
                   <div className="flex justify-between text-base font-bold pt-1">
-                    <dt>Total pagado</dt>
+                    <dt>
+                      {["revision", "contra_entrega"].includes(statusOf(selected))
+                        ? "Total a cobrar"
+                        : "Total pagado"}
+                    </dt>
                     <dd>{money(selected.total)}</dd>
                   </div>
                 </dl>
@@ -666,11 +714,40 @@ function Actions({
 }) {
   const s = statusOf(order);
   const pickup = isPickup(order);
-  const canCancel = s === "pagado" || s === "pendiente" || s === "enviado";
+  const canCancel =
+    s === "revision" ||
+    s === "contra_entrega" ||
+    s === "pagado" ||
+    s === "pendiente" ||
+    s === "enviado";
 
   return (
     <>
       <div className="flex flex-col sm:flex-row gap-3">
+        {s === "revision" && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onStatus(order, "pagado")}
+            className="btn-primary flex-1"
+          >
+            {busy ? <Loader2 size={18} className="animate-spin" /> : null}
+            Aprobar pago (transferencia recibida)
+          </button>
+        )}
+
+        {s === "contra_entrega" && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onStatus(order, "entregado")}
+            className="btn-primary flex-1"
+          >
+            {busy ? <Loader2 size={18} className="animate-spin" /> : null}
+            Ya recogió y pagó (entregado)
+          </button>
+        )}
+
         {s === "pagado" && !pickup && (
           <button
             type="button"
@@ -740,7 +817,7 @@ function Actions({
           Corregir estado manualmente
         </summary>
         <div className="mt-3 flex flex-wrap gap-2">
-          {["pagado", "enviado", "entregado", "cancelado"]
+          {["revision", "contra_entrega", "pagado", "enviado", "entregado", "cancelado"]
             .filter((st) => st !== s)
             .map((st) => (
               <button

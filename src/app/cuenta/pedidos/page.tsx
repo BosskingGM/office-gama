@@ -12,7 +12,7 @@ const money = (n: number) =>
 
 const FILTERS = [
   { key: "all", label: "Todos", statuses: null },
-  { key: "proceso", label: "En proceso", statuses: ["pendiente", "pagado"] },
+  { key: "proceso", label: "En proceso", statuses: ["revision", "contra_entrega", "pendiente", "pagado"] },
   { key: "enviado", label: "Enviados", statuses: ["enviado"] },
   { key: "entregado", label: "Entregados", statuses: ["entregado"] },
   { key: "cancelado", label: "Cancelados", statuses: ["cancelado"] },

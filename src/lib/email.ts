@@ -1,7 +1,12 @@
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { SHIPPING_OPTIONS, type ShippingType } from "@/lib/shipping";
-import { STORE_ADDRESS_FULL, STORE_MAPS_URL } from "@/lib/store";
+import {
+  BANK_TRANSFER,
+  STORE_ADDRESS_FULL,
+  STORE_MAPS_URL,
+  STORE_WHATSAPP_URL,
+} from "@/lib/store";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -256,6 +261,119 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
     return true;
   } catch (err) {
     console.error("Error enviando correo de confirmación:", err);
+    return false;
+  }
+}
+
+
+// Correo al crear un pedido por transferencia o "pagar al recoger".
+export async function sendOfflineOrderEmail(orderId: string): Promise<boolean> {
+  try {
+    const { data: order, error } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .single();
+
+    if (error || !order || !order.user_email) {
+      console.error("Correo offline: pedido sin correo o no encontrado:", orderId, error);
+      return false;
+    }
+
+    const { data: items } = await supabaseAdmin
+      .from("order_items")
+      .select("quantity, price, product_name, variant_name")
+      .eq("order_id", orderId);
+
+    const rows = (items || [])
+      .map(
+        (it: any) => `
+          <tr>
+            <td style="padding:10px 0;">${esc(it.product_name || "Producto")}${
+              it.variant_name ? ` <span style="color:#6b7280;">(${esc(it.variant_name)})</span>` : ""
+            }</td>
+            <td style="text-align:center;">${esc(it.quantity)}</td>
+            <td style="text-align:right;">$${esc(it.price)} MXN</td>
+          </tr>`
+      )
+      .join("");
+
+    const shortId = orderId.slice(0, 8);
+    const transfer = order.status === "revision";
+    const isPickup = order.shipping_type === "pickup";
+
+    const payBlock = transfer
+      ? `<h3>💳 Datos para tu transferencia</h3>
+         <p style="line-height:1.7; color:#374151;">
+           <strong>Banco:</strong> ${esc(BANK_TRANSFER.bank)}<br/>
+           <strong>Titular:</strong> ${esc(BANK_TRANSFER.holder)}<br/>
+           <strong>CLABE:</strong> ${esc(BANK_TRANSFER.clabe)}<br/>
+           <strong>Concepto:</strong> Pedido #${esc(shortId)}<br/>
+           <strong>Monto exacto:</strong> $${esc(order.total)} MXN
+         </p>
+         <p style="color:#374151;">
+           Cuando pagues, envíanos tu comprobante por
+           <a href="${esc(STORE_WHATSAPP_URL)}" style="color:#7c3aed;">WhatsApp</a>.
+           Tu pedido está <strong>en revisión</strong> y tus piezas quedaron apartadas;
+           te avisaremos por correo en cuanto aprobemos tu pago.
+         </p>`
+      : `<h3>💵 Pagas al recoger</h3>
+         <p style="color:#374151;">
+           Tu pedido quedó apartado. Paga <strong>$${esc(order.total)} MXN</strong> en la tienda
+           cuando pases por él.
+         </p>`;
+
+    const whereBlock = isPickup
+      ? `<h3>📍 Recoge tu pedido en:</h3>
+         <p style="line-height:1.6; color:#374151;">
+           ${esc(STORE_ADDRESS_FULL)}<br/>
+           <a href="${esc(STORE_MAPS_URL)}" style="color:#7c3aed;">Ver en Google Maps</a>
+         </p>`
+      : `<h3>📦 Dirección de envío:</h3>
+         <p style="line-height:1.6; color:#374151;">
+           ${esc(order.full_name)}<br/>${esc(order.address)}<br/>${esc(order.city)}<br/>
+           CP: ${esc(order.postal_code)}<br/>Tel: ${esc(order.phone)}
+         </p>`;
+
+    const { error: sendError } = await resend.emails.send({
+      from: "Office Gama <ventas@officegama.com>",
+      to: order.user_email,
+      subject: transfer
+        ? `Pedido #${shortId}: realiza tu transferencia 💳`
+        : `Pedido #${shortId} apartado ✅`,
+      html: `
+        <div style="font-family: Arial, sans-serif; background:#f3f4f6; padding:40px;">
+          <div style="max-width:600px; margin:auto; background:white; padding:30px; border-radius:12px; border:1px solid #e5e7eb;">
+            <h2 style="color:#111827;">¡Gracias, ${esc(order.full_name)}! 💜</h2>
+            <p style="color:#374151;">Registramos tu pedido <strong>#${esc(shortId)}</strong>.</p>
+            ${payBlock}
+            <hr style="margin:25px 0;" />
+            <h3>🛍 Tu pedido:</h3>
+            <table width="100%" style="border-collapse:collapse; font-size:14px;">
+              <thead>
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                  <th align="left">Producto</th><th align="center">Cantidad</th><th align="right">Precio</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+            <hr style="margin:25px 0;" />
+            ${whereBlock}
+            <p style="margin-top:25px; font-size:14px; color:#6b7280;">
+              Gracias por confiar en <strong>Office Gama</strong> 💙
+            </p>
+          </div>
+        </div>
+      `,
+    });
+
+    if (sendError) {
+      console.error("Resend rechazó el correo del pedido offline:", sendError);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Error enviando correo del pedido offline:", err);
     return false;
   }
 }

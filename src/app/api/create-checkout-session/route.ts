@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getUserFromRequest } from "@/lib/auth-server";
+import { createOfflineOrder } from "@/lib/offline-order";
+import { isPaymentMethod, paymentMethodsFor } from "@/lib/payment";
 import {
   LOCAL_COVERAGE_TEXT,
   SHIPPING_OPTIONS,
@@ -68,6 +70,12 @@ export async function POST(req: Request) {
       return fail("Tipo de envío inválido");
     }
     const shippingCost = SHIPPING_OPTIONS[shippingType].cost;
+
+    // Método de pago (por defecto tarjeta, como antes). "Pagar al recoger" solo con pickup.
+    const paymentMethod = body.payment_method ?? "tarjeta";
+    if (!isPaymentMethod(paymentMethod) || !paymentMethodsFor(shippingType).includes(paymentMethod)) {
+      return fail("Ese método de pago no está disponible para este tipo de entrega");
+    }
 
     const customer = {
       full_name: cleanText(body.customer?.full_name),
@@ -190,6 +198,24 @@ export async function POST(req: Request) {
         },
         quantity,
       });
+    }
+
+    // Transferencia o pagar al recoger: no pasa por Stripe; el pedido se crea aquí.
+    if (paymentMethod !== "tarjeta") {
+      const result = await createOfflineOrder({
+        userId: user.id,
+        userEmail: user.email ?? null,
+        method: paymentMethod,
+        items: cartItems,
+        shippingType,
+        shippingCost,
+        customer,
+        latitude,
+        longitude,
+      });
+      return result.ok
+        ? NextResponse.json({ orderId: result.orderId })
+        : fail(result.error, result.status);
     }
 
     if (shippingCost > 0) {

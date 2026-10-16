@@ -23,4 +23,4 @@ export const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 export const initialOf = (name: string, email?: string | null) =>
   (name.trim()[0] || email?.[0] || "?").toUpperCase();
 
-export const WHATSAPP_URL = "https://wa.me/525618060088";
+export { STORE_WHATSAPP_URL as WHATSAPP_URL } from "@/lib/store";

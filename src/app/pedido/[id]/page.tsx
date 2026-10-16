@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { SHIPPING_OPTIONS, type ShippingType } from "@/lib/shipping";
-import { STORE_ADDRESS_FULL, STORE_MAPS_URL } from "@/lib/store";
+import {
+  BANK_TRANSFER,
+  STORE_ADDRESS_FULL,
+  STORE_MAPS_URL,
+  STORE_WHATSAPP_URL,
+} from "@/lib/store";
 import StatusBadge, { statusInfo } from "@/components/StatusBadge";
 
 const money = (n: number) =>
@@ -17,6 +22,11 @@ export default function PedidoPage() {
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [justCreated, setJustCreated] = useState(false);
+
+  useEffect(() => {
+    setJustCreated(new URLSearchParams(window.location.search).get("nuevo") === "1");
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -94,12 +104,48 @@ export default function PedidoPage() {
               day: "numeric",
             })}
           </p>
+          {justCreated && (
+            <p role="status" className="text-sm bg-green-50 border border-green-200 text-green-900 rounded-xl px-4 py-3">
+              ¡Pedido registrado! También te enviamos estas instrucciones por correo.
+            </p>
+          )}
           {statusInfo(order.status).help && (
             <p className="text-sm bg-brand-soft rounded-xl px-4 py-3">
               {statusInfo(order.status).help}
             </p>
           )}
         </header>
+
+        {/* Cómo pagar */}
+        {order.status === "revision" && (
+          <section className="space-y-3 rounded-2xl border-2 border-brand-strong bg-brand-soft p-5">
+            <h2 className="font-bold text-lg">Datos para tu transferencia</h2>
+            <dl className="text-sm space-y-1.5">
+              <div className="flex justify-between gap-4"><dt className="text-neutral-600">Banco</dt><dd className="font-semibold text-right">{BANK_TRANSFER.bank}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-neutral-600">Titular</dt><dd className="font-semibold text-right">{BANK_TRANSFER.holder}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-neutral-600">CLABE</dt><dd className="font-semibold text-right break-all">{BANK_TRANSFER.clabe}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-neutral-600">Concepto</dt><dd className="font-semibold text-right">Pedido #{order.id.slice(0, 8).toUpperCase()}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-neutral-600">Monto exacto</dt><dd className="font-extrabold text-right">{money(order.total)}</dd></div>
+            </dl>
+            <a
+              href={STORE_WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary w-full"
+            >
+              Enviar comprobante por WhatsApp
+            </a>
+          </section>
+        )}
+
+        {order.status === "contra_entrega" && (
+          <section className="rounded-2xl border-2 border-brand-strong bg-brand-soft p-5 text-sm space-y-1">
+            <h2 className="font-bold text-lg">Pagas al recoger</h2>
+            <p>
+              Lleva <strong>{money(order.total)}</strong> y recoge tu pedido en la tienda.
+            </p>
+          </section>
+        )}
 
         {/* Productos */}
         <section className="space-y-4">

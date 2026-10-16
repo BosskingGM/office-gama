@@ -10,6 +10,16 @@ const STATUS: Record<
     className: "bg-green-100 text-green-800",
     help: "Recibimos tu pago. Estamos preparando tu pedido.",
   },
+  revision: {
+    label: "En revisión",
+    className: "bg-amber-100 text-amber-800",
+    help: "Estamos revisando tu transferencia. Tus piezas están apartadas; te avisamos por correo al aprobar tu pago.",
+  },
+  contra_entrega: {
+    label: "Pago al recoger",
+    className: "bg-orange-100 text-orange-800",
+    help: "Tu pedido está apartado. Paga en la tienda cuando pases por él.",
+  },
   pendiente: {
     label: "Pendiente",
     className: "bg-yellow-100 text-yellow-800",

@@ -22,6 +22,11 @@ import AddressFields, {
 import { STORE_MAPS_URL, STORE_PICKUP_DATA } from "@/lib/store";
 import { joinAddress, splitAddress, norm } from "@/lib/address";
 import {
+  PAYMENT_METHODS,
+  paymentMethodsFor,
+  type PaymentMethod,
+} from "@/lib/payment";
+import {
   LOCAL_COVERAGE_TEXT,
   SHIPPING_OPTIONS,
   isInsideLocalZone,
@@ -138,6 +143,7 @@ export default function CarritoPage() {
     increaseQuantity,
     decreaseQuantity,
     syncCart,
+    clearCart,
   } = useCart();
   const router = useRouter();
 
@@ -145,6 +151,7 @@ export default function CarritoPage() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [shippingType, setShippingType] = useState<ShippingType>("pickup");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("tarjeta");
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
   const [notice, setNotice] = useState("");
@@ -260,6 +267,8 @@ export default function CarritoPage() {
   const chooseShipping = (key: ShippingType) => {
     setShippingType(key);
     setErrors({});
+    // "Pagar al recoger" solo existe con recoger en tienda.
+    if (!paymentMethodsFor(key).includes(paymentMethod)) setPaymentMethod("tarjeta");
     if (key === "local") {
       // La entrega local solo existe en Chalco e Ixtapaluca: se obliga a elegir.
       setForm((f) => {
@@ -336,11 +345,19 @@ export default function CarritoPage() {
             quantity: item.quantity,
           })),
           shipping: { shipping_type: shippingType },
+          payment_method: paymentMethod,
           customer,
         }),
       });
 
       const data = await response.json().catch(() => ({}));
+
+      // Transferencia o pagar al recoger: el pedido ya quedó creado, sin pasar por Stripe.
+      if (response.ok && data.orderId) {
+        clearCart();
+        router.push(`/pedido/${data.orderId}?nuevo=1`);
+        return;
+      }
 
       if (response.ok && data.url) {
         window.location.href = data.url;
@@ -668,6 +685,51 @@ export default function CarritoPage() {
               </div>
             </div>
           </section>
+
+          {/* Método de pago */}
+          <section className="card p-5 sm:p-7 space-y-4">
+            <h2 className="text-xl font-bold">¿Cómo vas a pagar?</h2>
+            <div
+              role="radiogroup"
+              aria-label="Método de pago"
+              className="grid sm:grid-cols-3 gap-3"
+            >
+              {paymentMethodsFor(shippingType).map((key) => {
+                const active = paymentMethod === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setPaymentMethod(key)}
+                    className={`text-left rounded-2xl border-2 p-4 transition ${
+                      active
+                        ? "border-brand-strong bg-brand-soft"
+                        : "border-line bg-white hover:border-brand"
+                    }`}
+                  >
+                    <p className="font-semibold text-sm">{PAYMENT_METHODS[key].label}</p>
+                    <p className="text-xs text-muted mt-1 leading-4">
+                      {PAYMENT_METHODS[key].note}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+            {paymentMethod === "transferencia" && (
+              <p className="text-sm bg-brand-soft rounded-xl px-4 py-3">
+                Al confirmar te mostraremos los datos bancarios. Tus piezas quedan
+                apartadas y el pedido pasa a <strong>revisión</strong> hasta que
+                validemos tu pago.
+              </p>
+            )}
+            {paymentMethod === "efectivo_tienda" && (
+              <p className="text-sm bg-brand-soft rounded-xl px-4 py-3">
+                Apartamos tus piezas y pagas en la tienda al recogerlas.
+              </p>
+            )}
+          </section>
         </div>
 
         {/* RESUMEN */}
@@ -721,16 +783,24 @@ export default function CarritoPage() {
             {loading ? (
               "Procesando…"
             ) : user ? (
-              <>
-                <Lock size={18} /> Pagar con tarjeta
-              </>
+              paymentMethod === "tarjeta" ? (
+                <>
+                  <Lock size={18} /> Pagar con tarjeta
+                </>
+              ) : paymentMethod === "transferencia" ? (
+                "Confirmar y pagar por transferencia"
+              ) : (
+                "Confirmar pedido"
+              )
             ) : (
               "Iniciar sesión para pagar"
             )}
           </button>
 
           <p className="text-xs text-muted text-center">
-            Pago seguro con Stripe. No guardamos los datos de tu tarjeta.
+            {paymentMethod === "tarjeta"
+              ? "Pago seguro con Stripe. No guardamos los datos de tu tarjeta."
+              : "No se hace ningún cargo ahora."}
           </p>
         </aside>
       </div>

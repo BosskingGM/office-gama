@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendOrderShippedEmail } from "@/lib/email";
+import { sendOrderConfirmationEmail, sendOrderShippedEmail } from "@/lib/email";
 import { getUserFromRequest, isAdminUser } from "@/lib/auth-server";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const sent = await sendOrderShippedEmail(orderId);
+    // "approved" = pago por transferencia aprobado; por defecto, aviso de envío.
+    const sent =
+      body?.kind === "approved"
+        ? await sendOrderConfirmationEmail(orderId)
+        : await sendOrderShippedEmail(orderId);
 
     if (!sent) {
       return NextResponse.json(
