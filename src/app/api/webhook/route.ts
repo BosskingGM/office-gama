@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { fulfillPaidSession } from "@/lib/fulfill-order";
+import { releaseCouponByCart } from "@/lib/coupons";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,14 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error("❌ Webhook signature error:", err.message);
     return NextResponse.json({ error: "Webhook Error" }, { status: 400 });
+  }
+
+  // El pago expiró sin completarse: el cupón reservado vuelve a estar disponible.
+  if (event.type === "checkout.session.expired") {
+    const expired = event.data.object as Stripe.Checkout.Session;
+    const cartId = expired.metadata?.cart_id;
+    if (cartId) await releaseCouponByCart(cartId);
+    return NextResponse.json({ received: true });
   }
 
   if (

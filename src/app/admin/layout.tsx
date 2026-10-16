@@ -9,6 +9,7 @@ import {
   Megaphone,
   Package,
   Store,
+  Ticket,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -17,6 +18,7 @@ const LINKS = [
   { href: "/admin/pedidos", label: "Pedidos", icon: ClipboardList },
   { href: "/admin/inventario", label: "Inventario", icon: Package },
   { href: "/admin/promociones", label: "Promociones", icon: Megaphone },
+  { href: "/admin/cupones", label: "Cupones", icon: Ticket },
 ];
 
 export default function AdminLayout({

@@ -80,7 +80,13 @@ export default function PedidoPage() {
   const shippingLabel =
     SHIPPING_OPTIONS[order.shipping_type as ShippingType]?.label ?? "Envío";
   const shippingCost = Number(order.shipping_cost ?? 0);
-  const productsTotal = Number(order.total) - shippingCost;
+  // Productos a precio normal; si hubo cupón, el total pagado es menor.
+  const itemsTotal = ((order.order_items ?? []) as { price: number; quantity: number }[]).reduce(
+    (a, i) => a + Number(i.price) * Number(i.quantity),
+    0
+  );
+  const productsTotal = itemsTotal > 0 ? itemsTotal : Number(order.total) - shippingCost;
+  const discount = Math.round((productsTotal + shippingCost - Number(order.total)) * 100) / 100;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -217,6 +223,12 @@ export default function PedidoPage() {
             <span className="text-neutral-600">Productos</span>
             <span>{money(productsTotal)}</span>
           </div>
+          {discount >= 0.01 && (
+            <div className="flex justify-between text-ok">
+              <span>Descuento (cupón)</span>
+              <span>−{money(discount)}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-neutral-600">Envío</span>
             <span>{shippingCost === 0 ? "Gratis" : money(shippingCost)}</span>

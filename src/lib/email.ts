@@ -20,6 +20,24 @@ function esc(value: unknown) {
     .replace(/'/g, "&#39;");
 }
 
+// Si el pedido se pagó con cupón, el total es menor que productos + envío.
+// La diferencia se muestra como "Descuento" (se calcula de los artículos guardados).
+function discountLine(
+  order: { total?: unknown; shipping_cost?: unknown },
+  items: { price?: unknown; quantity?: unknown }[] | null | undefined
+) {
+  const subtotal = (items || []).reduce(
+    (a, i) => a + Number(i.price ?? 0) * Number(i.quantity ?? 0),
+    0
+  );
+  const d =
+    Math.round((subtotal + Number(order.shipping_cost ?? 0) - Number(order.total ?? 0)) * 100) /
+    100;
+  return d >= 0.01
+    ? `<strong>Descuento (cupón):</strong> -$${d.toFixed(2)} MXN<br/>\n              `
+    : "";
+}
+
 // Devuelve true si el correo se envió, false si algo falló.
 export async function sendOrderShippedEmail(orderId: string): Promise<boolean> {
   try {
@@ -105,7 +123,7 @@ export async function sendOrderShippedEmail(orderId: string): Promise<boolean> {
 
             <p>
               <strong>Pedido:</strong> #${esc(shortId)}<br/>
-              <strong>Total:</strong> $${esc(order.total)} MXN
+              ${discountLine(order, items)}<strong>Total:</strong> $${esc(order.total)} MXN
             </p>
 
             <hr style="margin:25px 0;" />
@@ -230,7 +248,7 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<boole
             <p>
               <strong>Pedido:</strong> #${esc(shortId)}<br/>
               <strong>Entrega:</strong> ${esc(shippingLabel)}<br/>
-              <strong>Total pagado:</strong> $${esc(order.total)} MXN
+              ${discountLine(order, items)}<strong>Total pagado:</strong> $${esc(order.total)} MXN
             </p>
             <hr style="margin:25px 0;" />
             <h3>🛍 Tu pedido:</h3>
@@ -309,7 +327,7 @@ export async function sendOfflineOrderEmail(orderId: string): Promise<boolean> {
            <strong>Titular:</strong> ${esc(BANK_TRANSFER.holder)}<br/>
            <strong>CLABE:</strong> ${esc(BANK_TRANSFER.clabe)}<br/>
            <strong>Concepto:</strong> Pedido #${esc(shortId)}<br/>
-           <strong>Monto exacto:</strong> $${esc(order.total)} MXN
+           ${discountLine(order, items)}<strong>Monto exacto:</strong> $${esc(order.total)} MXN
          </p>
          <p style="color:#374151;">
            Cuando pagues, envíanos tu comprobante por

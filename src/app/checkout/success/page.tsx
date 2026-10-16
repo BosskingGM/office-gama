@@ -199,6 +199,8 @@ function SuccessContent() {
   const shortId = order.id.slice(0, 8);
   const items = order.order_items ?? [];
   const productsTotal = items.reduce((a, i) => a + i.price * i.quantity, 0);
+  const discount =
+    Math.round((productsTotal + Number(order.shipping_cost ?? 0) - Number(order.total)) * 100) / 100;
 
   const steps = pickup
     ? ["Preparamos tu pedido", "Te avisamos cuando esté listo", "Lo recoges en la tienda"]
@@ -252,6 +254,12 @@ function SuccessContent() {
             <dt className="text-neutral-600">Productos</dt>
             <dd className="font-medium">{money(productsTotal)}</dd>
           </div>
+          {discount >= 0.01 && (
+            <div className="flex justify-between text-ok">
+              <dt>Descuento (cupón)</dt>
+              <dd className="font-medium">−{money(discount)}</dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt className="text-neutral-600">{shippingLabel}</dt>
             <dd className="font-medium">

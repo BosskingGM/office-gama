@@ -11,6 +11,7 @@ import {
   Minus,
   Plus,
   ShoppingBag,
+  Tag,
   Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -47,6 +48,11 @@ const SHIPPING_NOTES: Record<ShippingType, string> = {
 };
 
 const FORM_KEY = "officegama_checkout_form";
+
+type AppliedCoupon = { code: string; percent: number; discount: number; forSubtotal: number };
+type CouponCheck =
+  | { ok: true; coupon: AppliedCoupon }
+  | { ok: false; error: string };
 
 type FormState = AddrValue & {
   full_name: string;
@@ -156,9 +162,16 @@ export default function CarritoPage() {
   const [serverError, setServerError] = useState("");
   const [notice, setNotice] = useState("");
 
+  /* Cupón: el servidor lo valida y calcula el monto; aquí solo se muestra */
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
+
   const needsAddress = shippingType !== "pickup";
   const shippingCost = SHIPPING_OPTIONS[shippingType].cost; // solo informativo
-  const total = subtotal + shippingCost;
+  const discount = coupon ? Math.min(coupon.discount, subtotal) : 0;
+  const total = Math.max(0, subtotal - discount + shippingCost);
 
   /* Sesión */
   useEffect(() => {
@@ -239,6 +252,84 @@ export default function CarritoPage() {
         setNotice(`Actualizamos precio o existencias de: ${adjusted.join(", ")}.`);
     });
   }, [hydrated]);
+
+  /* Pregunta al servidor si el cupón sirve para este carrito (no lo gasta) */
+  const checkCoupon = async (code: string): Promise<CouponCheck> => {
+    const forSubtotal = subtotal;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return { ok: false, error: "Inicia sesión para usar un cupón." };
+    try {
+      const res = await fetch("/api/validate-coupon", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          code,
+          phone: form.phone,
+          items: cart.map((i) => ({ variant_id: i.variant_id, quantity: i.quantity })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.valid) {
+        return {
+          ok: true,
+          coupon: {
+            code: data.code,
+            percent: data.percent,
+            discount: data.discount,
+            forSubtotal,
+          },
+        };
+      }
+      return { ok: false, error: data.error || "No pudimos validar el cupón." };
+    } catch {
+      return { ok: false, error: "No pudimos validar el cupón. Revisa tu conexión." };
+    }
+  };
+
+  const applyCouponCode = async () => {
+    const code = couponInput.trim();
+    if (!code || couponBusy) return;
+    setCouponError("");
+    setCouponBusy(true);
+    const r = await checkCoupon(code);
+    setCouponBusy(false);
+    if (r.ok) {
+      setCoupon(r.coupon);
+      setCouponInput("");
+    } else {
+      setCouponError(r.error);
+    }
+  };
+
+  const removeCoupon = () => {
+    setCoupon(null);
+    setCouponError("");
+  };
+
+  // Si cambian las piezas, el descuento se recalcula (o se quita si ya no aplica).
+  useEffect(() => {
+    if (!coupon || !hydrated || coupon.forSubtotal === subtotal) return;
+    let alive = true;
+    (async () => {
+      const r = await checkCoupon(coupon.code);
+      if (!alive) return;
+      if (r.ok) {
+        setCoupon((c) => (c && c.code === r.coupon.code ? r.coupon : c));
+      } else {
+        setCoupon(null);
+        setCouponError(r.error);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal, coupon?.code, hydrated]);
 
   const patchForm = (patch: Partial<FormState>) => {
     setForm((f) => ({ ...f, ...patch }));
@@ -347,10 +438,19 @@ export default function CarritoPage() {
           shipping: { shipping_type: shippingType },
           payment_method: paymentMethod,
           customer,
+          ...(coupon ? { coupon_code: coupon.code } : {}),
         }),
       });
 
       const data = await response.json().catch(() => ({}));
+
+      // El servidor rechazó el cupón (ya usado, vencido, etc.): se quita para no cobrar mal.
+      if (!response.ok && data.coupon_error) {
+        setCoupon(null);
+        setCouponError(data.error || "El cupón ya no es válido.");
+        setLoading(false);
+        return;
+      }
 
       // Transferencia o pagar al recoger: el pedido ya quedó creado, sin pasar por Stripe.
       if (response.ok && data.orderId) {
@@ -743,6 +843,14 @@ export default function CarritoPage() {
               </dt>
               <dd className="font-medium">{money(subtotal)}</dd>
             </div>
+            {coupon && (
+              <div className="flex justify-between text-ok">
+                <dt>
+                  Cupón {coupon.code} (−{coupon.percent}%)
+                </dt>
+                <dd className="font-medium">−{money(discount)}</dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt className="text-neutral-600">
                 Envío ({SHIPPING_OPTIONS[shippingType].label})
@@ -752,6 +860,68 @@ export default function CarritoPage() {
               </dd>
             </div>
           </dl>
+
+          {/* Cupón */}
+          <div>
+            {coupon ? (
+              <div className="flex items-center justify-between gap-3 text-sm bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
+                <span className="flex items-center gap-2 font-medium text-ok min-w-0">
+                  <Tag size={16} className="shrink-0" aria-hidden="true" />
+                  <span className="truncate">Cupón {coupon.code} aplicado</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={removeCoupon}
+                  className="text-xs font-semibold text-neutral-600 underline shrink-0"
+                >
+                  Quitar
+                </button>
+              </div>
+            ) : (
+              <>
+                <label htmlFor="coupon" className="text-sm font-medium mb-1.5 block">
+                  ¿Tienes un cupón?
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="coupon"
+                    value={couponInput}
+                    onChange={(e) => {
+                      setCouponInput(e.target.value.toUpperCase());
+                      setCouponError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        applyCouponCode();
+                      }
+                    }}
+                    placeholder="Escribe tu código"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    maxLength={30}
+                    aria-invalid={!!couponError}
+                    aria-describedby={couponError ? "err-coupon" : undefined}
+                    className="field min-w-0 uppercase"
+                  />
+                  <button
+                    type="button"
+                    onClick={applyCouponCode}
+                    disabled={couponBusy || !couponInput.trim()}
+                    className="btn-outline shrink-0 text-sm px-5!"
+                  >
+                    {couponBusy ? "…" : "Aplicar"}
+                  </button>
+                </div>
+              </>
+            )}
+            {couponError && (
+              <p id="err-coupon" role="alert" className="text-xs text-danger mt-1.5">
+                {couponError}
+              </p>
+            )}
+          </div>
 
           <div className="flex justify-between items-baseline border-t border-line pt-4">
             <span className="font-semibold">Total</span>

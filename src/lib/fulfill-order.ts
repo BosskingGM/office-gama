@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { mapsLink } from "@/lib/shipping";
 import { sendOrderConfirmationEmail } from "@/lib/email";
+import { couponNote, finalizeCoupon } from "@/lib/coupons";
 
 type CartItem = {
   variant_id: string;
@@ -165,7 +166,28 @@ export async function fulfillPaidSession(
     }
   }
 
+  // Cupón: la reserva hecha al iniciar el pago pasa a "usado" (una vez por cliente).
+  let couponLine = "";
+  if (cart.coupon_id) {
+    const discount = Number(cart.discount_amount || 0);
+    const code = String(cart.coupon_code || "");
+    couponLine = couponNote(code, discount);
+    const used = await finalizeCoupon({
+      couponId: String(cart.coupon_id),
+      userId: String(cart.user_id),
+      phone: customer?.phone,
+      orderId: String(order.id),
+      discount,
+    });
+    if (!used) {
+      // El pago ya se cobró con descuento: el pedido se conserva y se avisa al admin.
+      console.error("⚠️ No se pudo registrar el uso del cupón:", code, order.id);
+      couponLine += " (REVISAR: no se pudo registrar el uso del cupón)";
+    }
+  }
+
   const notes = [
+    couponLine,
     stockProblems.length > 0
       ? `Stock insuficiente al confirmar el pago: ${stockProblems.join(", ")}`
       : "",

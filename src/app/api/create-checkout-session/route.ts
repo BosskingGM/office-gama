@@ -5,6 +5,16 @@ import { getUserFromRequest } from "@/lib/auth-server";
 import { createOfflineOrder } from "@/lib/offline-order";
 import { isPaymentMethod, paymentMethodsFor } from "@/lib/payment";
 import {
+  CARD_RESERVATION_MINUTES,
+  CARD_SESSION_MINUTES,
+  COUPON_CODE_RE,
+  OFFLINE_RESERVATION_MINUTES,
+  applyCoupon,
+  normalizeCouponCode,
+  releaseCoupon,
+  type AppliedCoupon,
+} from "@/lib/coupons";
+import {
   LOCAL_COVERAGE_TEXT,
   SHIPPING_OPTIONS,
   isInsideLocalZone,
@@ -25,8 +35,8 @@ const MAX_DIFFERENT_ITEMS = 40;
 
 type RequestItem = { variant_id: string; quantity: number };
 
-function fail(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
+function fail(message: string, status = 400, extra: Record<string, unknown> = {}) {
+  return NextResponse.json({ error: message, ...extra }, { status });
 }
 
 function cleanText(value: unknown, max = 200) {
@@ -34,6 +44,19 @@ function cleanText(value: unknown, max = 200) {
 }
 
 export async function POST(req: Request) {
+  // Cupón reservado para este pago. Si algo falla antes de terminar, se libera.
+  let reservation: { couponId: string; userId: string } | null = null;
+  const releaseReservation = async () => {
+    if (!reservation) return;
+    const r = reservation;
+    reservation = null;
+    await releaseCoupon(r.couponId, r.userId);
+  };
+  const bail = async (message: string, status = 400, extra: Record<string, unknown> = {}) => {
+    await releaseReservation();
+    return NextResponse.json({ error: message, ...extra }, { status });
+  };
+
   try {
     // 1) Quién compra: se verifica con el token de sesión, no con lo que diga el navegador.
     const user = await getUserFromRequest(req);
@@ -200,6 +223,46 @@ export async function POST(req: Request) {
       });
     }
 
+    // 4b) Cupón (opcional). El descuento SIEMPRE lo calcula el servidor sobre los
+    //     precios reales; la reserva evita que el mismo cupón se use dos veces.
+    const subtotalCents = cartItems.reduce(
+      (sum, i) => sum + Math.round(i.price * 100) * i.quantity,
+      0
+    );
+    const couponCode = normalizeCouponCode(body.coupon_code);
+    let coupon: AppliedCoupon | null = null;
+
+    if (couponCode) {
+      if (!COUPON_CODE_RE.test(couponCode)) {
+        return fail("Ese cupón no existe. Revisa que esté bien escrito.", 409, {
+          coupon_error: true,
+        });
+      }
+      const applied = await applyCoupon({
+        code: couponCode,
+        userId: user.id,
+        phone: customer.phone,
+        subtotal: subtotalCents / 100,
+        ttlMinutes:
+          paymentMethod === "tarjeta" ? CARD_RESERVATION_MINUTES : OFFLINE_RESERVATION_MINUTES,
+      });
+      if (!applied.ok) {
+        return fail(applied.error, 409, { coupon_error: true });
+      }
+      coupon = applied.coupon;
+      reservation = { couponId: coupon.couponId, userId: user.id };
+
+      // Si este cliente dejó un pago a medias con el mismo cupón, ese pago se cancela.
+      if (coupon.replacedSessionId) {
+        try {
+          await stripe.checkout.sessions.expire(coupon.replacedSessionId);
+        } catch {
+          /* ya había vencido o se había pagado */
+        }
+      }
+    }
+    const discountCents = coupon ? Math.round(coupon.discount * 100) : 0;
+
     // Transferencia o pagar al recoger: no pasa por Stripe; el pedido se crea aquí.
     if (paymentMethod !== "tarjeta") {
       const result = await createOfflineOrder({
@@ -212,10 +275,24 @@ export async function POST(req: Request) {
         customer,
         latitude,
         longitude,
+        coupon: coupon
+          ? { id: coupon.couponId, code: coupon.code, discount: coupon.discount }
+          : null,
       });
-      return result.ok
-        ? NextResponse.json({ orderId: result.orderId })
-        : fail(result.error, result.status);
+      if (result.ok) {
+        reservation = null; // el pedido ya consumió la reserva
+        return NextResponse.json({ orderId: result.orderId });
+      }
+      return bail(result.error, result.status);
+    }
+
+    // Stripe no cobra menos de $10 MXN
+    if (coupon && subtotalCents - discountCents + Math.round(shippingCost * 100) < 1000) {
+      return bail(
+        "Con este cupón el total queda por debajo del mínimo para pagar con tarjeta. Elige otro método de pago.",
+        409,
+        { coupon_error: true }
+      );
     }
 
     if (shippingCost > 0) {
@@ -246,21 +323,55 @@ export async function POST(req: Request) {
         customer: { ...customer, latitude, longitude },
         shipping_type: shippingType,
         shipping_cost: shippingCost,
+        ...(coupon
+          ? {
+              coupon_id: coupon.couponId,
+              coupon_code: coupon.code,
+              discount_amount: coupon.discount,
+            }
+          : {}),
       })
       .select("id")
       .single();
 
     if (cartError || !cart) {
       console.error("Error guardando carrito:", cartError);
-      return fail("No se pudo preparar el pago", 500);
+      return bail("No se pudo preparar el pago", 500);
+    }
+
+    // La reserva queda ligada a este carrito (para liberarla si el pago expira).
+    if (coupon) {
+      await supabaseAdmin
+        .from("coupon_redemptions")
+        .update({ cart_id: String(cart.id) })
+        .eq("coupon_id", coupon.couponId)
+        .eq("user_id", user.id)
+        .eq("status", "reserved");
     }
 
     const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+
+    // El descuento va como un cupón de Stripe de monto fijo (solo sobre productos,
+    // nunca sobre el envío) para que Stripe cobre exactamente el total correcto.
+    const stripeCoupon = coupon
+      ? await stripe.coupons.create({
+          amount_off: discountCents,
+          currency: "mxn",
+          duration: "once",
+          max_redemptions: 1,
+          name: `Cupón ${coupon.code}`.slice(0, 40),
+        })
+      : null;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
       line_items,
+      ...(stripeCoupon ? { discounts: [{ coupon: stripeCoupon.id }] } : {}),
+      // Con cupón, el pago expira antes que la reserva: así el cupón no queda atorado.
+      ...(coupon
+        ? { expires_at: Math.floor(Date.now() / 1000) + CARD_SESSION_MINUTES * 60 }
+        : {}),
       customer_email: user.email ?? undefined,
       client_reference_id: cart.id,
       success_url: `${siteUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -268,9 +379,21 @@ export async function POST(req: Request) {
       metadata: { cart_id: cart.id, user_id: user.id },
     });
 
+    if (coupon) {
+      await supabaseAdmin
+        .from("coupon_redemptions")
+        .update({ stripe_session_id: session.id })
+        .eq("coupon_id", coupon.couponId)
+        .eq("user_id", user.id)
+        .eq("status", "reserved");
+    }
+
+    // A partir de aquí el webhook (o la página de éxito) consume la reserva.
+    reservation = null;
     return NextResponse.json({ url: session.url });
   } catch (error) {
     console.error("❌ Error creando sesión:", error);
+    await releaseReservation();
     return fail("Error creando sesión de pago", 500);
   }
 }

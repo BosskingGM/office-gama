@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PromoSlide, THEMES, type ThemeKey } from "@/components/PromoBanner";
+import { STORE_WHATSAPP_URL } from "@/lib/store";
 
 /* =========================
    TIPOS Y AYUDAS
@@ -31,9 +32,20 @@ type DbPromo = {
   sort_order: number;
   starts_at: string | null;
   ends_at: string | null;
+  coupon_id?: string | null;
 };
 
-type LinkKind = "catalogo" | "none" | "custom";
+// Cupones que se pueden ofrecer con el botón "Obtener cupón" (WhatsApp)
+type CouponOption = {
+  id: string;
+  code: string;
+  description: string | null;
+  percent_off: number;
+  first_purchase_only: boolean;
+  active: boolean;
+};
+
+type LinkKind = "catalogo" | "none" | "custom" | "cupon";
 
 type FormState = {
   id: string | null;
@@ -42,6 +54,8 @@ type FormState = {
   button_text: string;
   link_kind: LinkKind;
   link_custom: string;
+  coupon_id: string; // solo con link_kind = "cupon"
+  hadCoupon: boolean; // la promo ya tenía cupón guardado (para poder quitárselo)
   theme: ThemeKey;
   active: boolean;
   starts_at: string; // formato datetime-local, "" = sin fecha
@@ -61,6 +75,8 @@ const EMPTY: FormState = {
   button_text: "",
   link_kind: "catalogo",
   link_custom: "",
+  coupon_id: "",
+  hadCoupon: false,
   theme: "lila",
   active: true,
   starts_at: "",
@@ -88,7 +104,11 @@ function fromLocalInput(v: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-function linkKindOf(url: string | null): { kind: LinkKind; custom: string } {
+function linkKindOf(
+  url: string | null,
+  couponId?: string | null
+): { kind: LinkKind; custom: string } {
+  if (couponId) return { kind: "cupon", custom: "" };
   if (!url) return { kind: "none", custom: "" };
   if (url === "#catalogo") return { kind: "catalogo", custom: "" };
   return { kind: "custom", custom: url };
@@ -175,10 +195,19 @@ export default function PromocionesPage() {
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [coupons, setCoupons] = useState<CouponOption[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+
+    // Cupones disponibles para el botón "Obtener cupón" (si aún no existen, se ignora)
+    const couponsRes = await supabase
+      .from("coupons")
+      .select("id, code, description, percent_off, first_purchase_only, active")
+      .order("created_at", { ascending: false });
+    setCoupons(couponsRes.error ? [] : ((couponsRes.data ?? []) as CouponOption[]));
+
     const { data, error: err } = await supabase
       .from("promotions")
       .select("*")
@@ -232,7 +261,7 @@ export default function PromocionesPage() {
   };
 
   const openEdit = (p: DbPromo) => {
-    const { kind, custom } = linkKindOf(p.link_url);
+    const { kind, custom } = linkKindOf(p.link_url, p.coupon_id);
     setFormError("");
     setForm({
       id: p.id,
@@ -241,6 +270,8 @@ export default function PromocionesPage() {
       button_text: p.button_text ?? "",
       link_kind: kind,
       link_custom: custom,
+      coupon_id: p.coupon_id ?? "",
+      hadCoupon: !!p.coupon_id,
       theme: (p.theme as ThemeKey) in THEMES ? (p.theme as ThemeKey) : "lila",
       active: p.active,
       starts_at: toLocalInput(p.starts_at),
@@ -278,7 +309,21 @@ export default function PromocionesPage() {
     ? form.previewUrl ?? (form.removeImage ? null : form.existingImageUrl)
     : null;
 
+  // "Obtener cupón": abre WhatsApp con un mensaje ya escrito. El código NO va en
+  // el enlace: tú se lo mandas por WhatsApp (así nadie lo ve en la tienda).
+  const couponLink = (f: FormState): string | null => {
+    const c = coupons.find((x) => x.id === f.coupon_id);
+    if (!c) return null;
+    const what =
+      f.title.trim() ||
+      c.description?.trim() ||
+      `${c.percent_off}% de descuento${c.first_purchase_only ? " en mi primera compra" : ""}`;
+    const text = `Hola Office Gama 👋 Quiero mi cupón: ${what}`;
+    return `${STORE_WHATSAPP_URL}?text=${encodeURIComponent(text)}`;
+  };
+
   const resolveLink = (f: FormState): string | null => {
+    if (f.link_kind === "cupon") return couponLink(f);
     if (f.link_kind === "catalogo") return "#catalogo";
     if (f.link_kind === "custom") return f.link_custom.trim() || null;
     return null;
@@ -290,7 +335,13 @@ export default function PromocionesPage() {
 
     const title = form.title.trim();
     const subtitle = form.subtitle.trim();
-    const button = form.button_text.trim();
+    const isCoupon = form.link_kind === "cupon";
+    if (isCoupon && !form.coupon_id) {
+      setFormError("Elige qué cupón se va a regalar con esta promoción.");
+      return;
+    }
+    // Con cupón el botón siempre existe: por defecto dice "Obtener cupón"
+    const button = form.button_text.trim() || (isCoupon ? "Obtener cupón" : "");
     const link = resolveLink(form);
 
     if (!currentImage && !title) {
@@ -345,6 +396,13 @@ export default function PromocionesPage() {
         active: form.active,
         starts_at: starts,
         ends_at: ends,
+        // Solo se toca coupon_id cuando hace falta, así el resto de promociones
+        // sigue funcionando aunque aún no se haya corrido supabase/coupons.sql
+        ...(isCoupon
+          ? { coupon_id: form.coupon_id }
+          : form.hadCoupon
+          ? { coupon_id: null }
+          : {}),
       };
 
       if (form.id) {
@@ -580,7 +638,9 @@ export default function PromocionesPage() {
                         id: "preview",
                         title: form.title.trim() || null,
                         subtitle: form.subtitle.trim() || null,
-                        button_text: form.button_text.trim() || null,
+                        button_text:
+                          form.button_text.trim() ||
+                          (form.link_kind === "cupon" ? "Obtener cupón" : null),
                         link_url: null,
                         image_url: currentImage,
                         theme: form.theme,
@@ -699,11 +759,44 @@ export default function PromocionesPage() {
                         className="field"
                       >
                         <option value="catalogo">El catálogo</option>
+                        <option value="cupon">Obtener cupón (WhatsApp)</option>
                         <option value="none">A ningún lado</option>
                         <option value="custom">Otra dirección</option>
                       </select>
                     </div>
                   </div>
+                  {form.link_kind === "cupon" && (
+                    <div className="space-y-2">
+                      <label htmlFor="p-coupon" className="text-sm font-medium block">
+                        Cupón que se ofrece
+                      </label>
+                      <select
+                        id="p-coupon"
+                        value={form.coupon_id}
+                        onChange={(e) => patch({ coupon_id: e.target.value })}
+                        className="field"
+                      >
+                        <option value="">Elegir un cupón…</option>
+                        {coupons.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.code} · {c.percent_off}%
+                            {c.first_purchase_only ? " · primera compra" : ""}
+                            {c.active ? "" : " (pausado)"}
+                          </option>
+                        ))}
+                      </select>
+                      {coupons.length === 0 && (
+                        <p className="text-xs text-danger">
+                          Primero crea un cupón en la sección Cupones.
+                        </p>
+                      )}
+                      <p className="text-xs text-muted leading-relaxed">
+                        El cliente toca el botón y se abre tu WhatsApp con un mensaje
+                        pidiendo su cupón. Tú le respondes con el código (en Cupones hay un
+                        botón para copiar ese mensaje). El código nunca se muestra en la tienda.
+                      </p>
+                    </div>
+                  )}
                   {form.link_kind === "custom" && (
                     <div>
                       <input

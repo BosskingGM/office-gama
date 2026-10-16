@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendOfflineOrderEmail } from "@/lib/email";
 import { OFFLINE_STATUS } from "@/lib/payment";
+import { couponNote, finalizeCoupon } from "@/lib/coupons";
 
 type Item = {
   variant_id: string;
@@ -30,6 +31,8 @@ type Input = {
   };
   latitude: number | null;
   longitude: number | null;
+  // Cupón ya validado y RESERVADO por el servidor (ver lib/coupons.ts)
+  coupon?: { id: string; code: string; discount: number } | null;
 };
 
 export type OfflineResult =
@@ -72,10 +75,11 @@ export async function createOfflineOrder(input: Input): Promise<OfflineResult> {
 
   // 2) Pedido
   const subtotal = input.items.reduce((a, i) => a + i.price * i.quantity, 0);
+  const discount = input.coupon?.discount ?? 0;
   const row: Record<string, unknown> = {
     user_id: input.userId,
     user_email: input.userEmail,
-    total: subtotal + input.shippingCost,
+    total: Math.max(0, Math.round((subtotal - discount + input.shippingCost) * 100) / 100),
     status: OFFLINE_STATUS[input.method],
     payment_method: input.method,
     full_name: input.customer.full_name,
@@ -90,6 +94,7 @@ export async function createOfflineOrder(input: Input): Promise<OfflineResult> {
     row.latitude = input.latitude;
     row.longitude = input.longitude;
   }
+  if (input.coupon) row.notes = couponNote(input.coupon.code, input.coupon.discount);
 
   const { data: order, error: orderError } = await supabaseAdmin
     .from("orders")
@@ -126,6 +131,28 @@ export async function createOfflineOrder(input: Input): Promise<OfflineResult> {
     await supabaseAdmin.from("orders").delete().eq("id", order.id);
     await releaseStock(reserved);
     return { ok: false, status: 500, error: "No pudimos registrar tu pedido. Intenta de nuevo." };
+  }
+
+  // 3b) El cupón pasa de "reservado" a "usado" junto con el pedido. Si no se pudo
+  //     (nadie más debería poder), se deshace todo: nunca un cupón gratis.
+  if (input.coupon) {
+    const used = await finalizeCoupon({
+      couponId: input.coupon.id,
+      userId: input.userId,
+      phone: input.customer.phone,
+      orderId: String(order.id),
+      discount: input.coupon.discount,
+    });
+    if (!used) {
+      await supabaseAdmin.from("order_items").delete().eq("order_id", order.id);
+      await supabaseAdmin.from("orders").delete().eq("id", order.id);
+      await releaseStock(reserved);
+      return {
+        ok: false,
+        status: 409,
+        error: "No pudimos aplicar tu cupón. Quítalo e intenta de nuevo.",
+      };
+    }
   }
 
   // 4) La tienda y las páginas de producto deben mostrar el stock nuevo.
