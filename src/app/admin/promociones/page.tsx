@@ -201,6 +201,23 @@ export default function PromocionesPage() {
     load();
   }, [load]);
 
+  // Pide a la tienda que se refresque ya, en lugar de esperar el minuto de caché.
+  const afterChange = useCallback(async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (token) {
+        await fetch("/api/revalidate-home", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    } catch {
+      /* si falla, la tienda se actualiza sola en máx. 1 minuto */
+    }
+    await load();
+  }, [load]);
+
   /* ---------- formulario ---------- */
 
   const closeForm = () => {
@@ -357,7 +374,7 @@ export default function PromocionesPage() {
       }
 
       closeForm();
-      await load();
+      await afterChange();
     } catch (e) {
       if (uploadedPath) {
         try {
@@ -382,7 +399,7 @@ export default function PromocionesPage() {
       .update({ active: !p.active })
       .eq("id", p.id);
     if (err) setError(`No se pudo cambiar: ${err.message}`);
-    await load();
+    await afterChange();
   };
 
   const move = async (index: number, dir: -1 | 1) => {
@@ -397,7 +414,7 @@ export default function PromocionesPage() {
     );
     const failed = results.find((r) => r.error);
     if (failed?.error) setError(`No se pudo reordenar: ${failed.error.message}`);
-    await load();
+    await afterChange();
   };
 
   const remove = async (p: DbPromo) => {
@@ -411,7 +428,7 @@ export default function PromocionesPage() {
       return;
     }
     await removeFile(p.image_url);
-    await load();
+    await afterChange();
   };
 
   /* ---------- vista ---------- */
