@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { Package, ShieldCheck, Truck } from "lucide-react";
 import Catalog from "@/components/Catalog";
+import PromoBanner, { type Promo } from "@/components/PromoBanner";
 
 // La portada se genera en el servidor y se refresca sola cada minuto:
 // el catálogo llega ya en el HTML (sin parpadeo y visible para Google).
@@ -32,6 +33,37 @@ async function getProducts() {
   return { products: data ?? [], failed: false };
 }
 
+// Promociones activas (las administra la dueña desde /admin/promociones).
+// Si la tabla aún no existe o falla, la portada simplemente no las muestra.
+async function getPromos(): Promise<Promo[]> {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+  const { data, error } = await supabase
+    .from("promotions")
+    .select("id, title, subtitle, button_text, link_url, image_url, theme")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("Error al cargar promociones:", error.message);
+    return [];
+  }
+  return (data ?? []) as Promo[];
+}
+
+// Se muestra cuando no hay ninguna promoción activa.
+const DEFAULT_PROMO: Promo = {
+  id: "default",
+  title: "Diseños que hacen tu escritorio feliz",
+  subtitle: "Papelería importada elegida uno por uno para ti.",
+  button_text: "Ver catálogo",
+  link_url: "#catalogo",
+  image_url: null,
+  theme: "lila",
+};
+
 const PERKS = [
   { icon: Truck, text: "Envíos a todo México" },
   { icon: Package, text: "Recoge gratis en tienda" },
@@ -39,52 +71,28 @@ const PERKS = [
 ];
 
 export default async function HomePage() {
-  const { products, failed } = await getProducts();
+  const [{ products, failed }, promos] = await Promise.all([
+    getProducts(),
+    getPromos(),
+  ]);
 
   return (
-    <div className="space-y-7 sm:space-y-10">
-      {/* HERO */}
-      <section className="relative overflow-hidden rounded-3xl sm:rounded-[2rem] bg-gradient-to-br from-brand-soft via-white to-peach-soft border border-line px-5 py-7 sm:px-10 sm:py-9 text-center">
-        <div
-          aria-hidden="true"
-          className="absolute -top-16 -left-16 w-40 h-40 sm:w-56 sm:h-56 rounded-full bg-brand/30 blur-3xl"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute -bottom-20 -right-10 w-44 h-44 sm:w-64 sm:h-64 rounded-full bg-peach/60 blur-3xl"
-        />
+    <div className="space-y-5 sm:space-y-8">
+      {/* PROMOCIONES */}
+      <PromoBanner promos={promos.length > 0 ? promos : [DEFAULT_PROMO]} />
 
-        <div className="relative max-w-2xl mx-auto space-y-3.5 sm:space-y-3 animate-fade-up">
-          <p className="inline-block text-[11px] sm:text-sm font-semibold tracking-wide uppercase text-brand-strong bg-white/80 px-3 sm:px-3.5 py-1 rounded-full border border-line">
-            Papelería importada
-          </p>
-
-          <h1 className="text-[1.65rem] sm:text-4xl font-extrabold leading-[1.1]">
-            Diseños que hacen
-            <span className="block text-brand-strong">tu escritorio feliz</span>
-          </h1>
-
-          <p className="text-neutral-600 text-sm sm:text-base max-w-lg mx-auto leading-snug sm:leading-normal">
-            Libretas, plumas, stickers, washi tapes y mucho más, elegidos uno
-            por uno para ti.
-          </p>
-
-          <div className="pt-1 sm:pt-2">
-            <a href="#catalogo" className="btn-primary text-[15px] sm:text-base px-7 py-2.5 sm:px-7 sm:py-2.5">
-              Ver catálogo
-            </a>
-          </div>
-
-          <ul className="pt-3 sm:pt-3 grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:justify-center sm:gap-x-6 sm:gap-y-2 text-[11px] leading-tight sm:text-sm text-neutral-600">
-            {PERKS.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2">
-                <Icon size={18} className="text-brand-strong shrink-0" />
-                {text}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+      {/* BENEFICIOS */}
+      <ul className="grid grid-cols-3 gap-1.5 sm:flex sm:justify-center sm:gap-x-8 text-[11px] leading-tight sm:text-sm text-neutral-600">
+        {PERKS.map(({ icon: Icon, text }) => (
+          <li
+            key={text}
+            className="flex flex-col sm:flex-row items-center text-center gap-1 sm:gap-2"
+          >
+            <Icon size={18} className="text-brand-strong shrink-0" />
+            {text}
+          </li>
+        ))}
+      </ul>
 
       {/* CATÁLOGO */}
       <section id="catalogo" className="scroll-mt-24">

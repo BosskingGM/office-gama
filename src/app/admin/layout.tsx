@@ -3,13 +3,20 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ClipboardList, LayoutDashboard, Package, Store } from "lucide-react";
+import {
+  ClipboardList,
+  LayoutDashboard,
+  Megaphone,
+  Package,
+  Store,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const LINKS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/pedidos", label: "Pedidos", icon: ClipboardList },
   { href: "/admin/inventario", label: "Inventario", icon: Package },
+  { href: "/admin/promociones", label: "Promociones", icon: Megaphone },
 ];
 
 export default function AdminLayout({
