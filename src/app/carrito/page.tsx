@@ -26,6 +26,7 @@ import {
   SHIPPING_OPTIONS,
   isInsideLocalZone,
   isInsideMexico,
+  isLocalCpRange,
   matchLocalCity,
   type LatLng,
   type ShippingType,
@@ -120,10 +121,10 @@ function validate(f: FormState, shippingType: ShippingType): Errors {
       if (pin) {
         if (!isInsideLocalZone(pin))
           e.location = "El pin está fuera de nuestra zona de entrega local (Chalco e Ixtapaluca)";
-      } else if (!(f.cp_city && matchLocalCity(f.cp_city)) && !e.postal_code) {
-        // Sin pin, el código postal debe poder verificarse como Chalco/Ixtapaluca.
+      } else if (!f.cp_city && !isLocalCpRange(f.postal_code) && !e.postal_code) {
+        // Sin pin ni municipio confirmado, el CP debe estar en el rango local.
         e.postal_code =
-          "No pudimos verificar tu código postal. Revisa que sea de Chalco o Ixtapaluca, o márcalo en el mapa";
+          "Ese código postal no parece de Chalco ni Ixtapaluca. Revísalo o márcalo en el mapa";
       }
     } else if (pin && !isInsideMexico(pin)) {
       e.location = "El pin debe estar dentro de México";
@@ -547,7 +548,7 @@ export default function CarritoPage() {
                 {needsAddress ? "Datos de entrega" : "Datos de contacto"}
               </h3>
 
-              {saved.length > 0 && (
+              {saved.length > 0 && needsAddress && (
                 <div className="mb-4">
                   <label
                     htmlFor="saved_address"

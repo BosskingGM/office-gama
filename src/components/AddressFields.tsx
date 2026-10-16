@@ -109,9 +109,9 @@ export default function AddressFields({
       setStatus("ok");
 
       const v = valueRef.current;
-      const patch: Partial<AddrValue> = { cp_city: data.municipio };
+      const patch: Partial<AddrValue> = { cp_city: data.municipio || null };
 
-      if (autofill.current || !v.city) {
+      if (data.municipio && (autofill.current || !v.city)) {
         patch.city = local ? matchLocalCity(data.municipio) ?? "" : data.municipio;
       }
 
@@ -228,7 +228,7 @@ export default function AddressFields({
 
   /* ---------- Avisos ---------- */
   const cpOutsideLocal =
-    local && status === "ok" && info !== null && !matchLocalCity(info.municipio);
+    local && status === "ok" && info !== null && !!info.municipio && !matchLocalCity(info.municipio);
   const pinOutside = local && pin !== null && !isInsideLocalZone(pin);
 
   const fieldClass = (k: keyof AddrErrors) =>

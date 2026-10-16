@@ -40,6 +40,11 @@ export function matchLocalCity(value: unknown): LocalCity | null {
   return LOCAL_CITIES.find((c) => norm(c) === n) ?? null;
 }
 
+// Respaldo cuando el servicio de códigos postales no dice el municipio:
+// los CP de Ixtapaluca y Chalco empiezan con 565 o 566. Es aproximado (en esos
+// rangos también hay CP de municipios vecinos); la fuente oficial manda cuando responde.
+export const isLocalCpRange = (cp: string) => /^56[56]\d\d$/.test(cp);
+
 /* =========================
    MAPA / UBICACIÓN
 ========================= */

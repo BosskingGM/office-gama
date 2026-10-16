@@ -49,7 +49,21 @@ function parse(cp: string, json: unknown): PostalInfo | null {
   };
 }
 
-async function fromUrl(cp: string, url: string): Promise<Result> {
+// Zippopotam: gratuita y sin token, pero solo da colonias y estado (no municipio).
+function parseZippo(cp: string, json: any): PostalInfo | null {
+  const places: any[] = Array.isArray(json?.places) ? json.places : [];
+  const colonias = Array.from(
+    new Set(places.map((p) => String(p?.["place name"] ?? "")).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b, "es"));
+  if (colonias.length === 0) return null;
+  return { cp, municipio: "", estado: String(places[0]?.state ?? ""), colonias };
+}
+
+async function fromUrl(
+  cp: string,
+  url: string,
+  parser: (cp: string, json: unknown) => PostalInfo | null = parse
+): Promise<Result> {
   try {
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
@@ -58,7 +72,7 @@ async function fromUrl(cp: string, url: string): Promise<Result> {
     });
     if (res.status === 404) return { ok: false, reason: "notfound" };
     if (!res.ok) return { ok: false, reason: "unavailable" };
-    const info = parse(cp, await res.json().catch(() => null));
+    const info = parser(cp, await res.json().catch(() => null));
     return info ? { ok: true, info } : { ok: false, reason: "notfound" };
   } catch {
     return { ok: false, reason: "unavailable" };
@@ -89,6 +103,12 @@ export async function lookupCp(cp: string): Promise<Result> {
     }
     if (r.reason === "unavailable") unavailable = true;
   }
+
+  // Último recurso: colonias sin municipio. No se guarda en caché para reintentar
+  // con las fuentes completas más adelante.
+  const z = await fromUrl(cp, `https://api.zippopotam.us/mx/${cp}`, parseZippo);
+  if (z.ok) return z;
+  if (z.reason === "unavailable") unavailable = true;
   // Si alguna fuente falló por red, no afirmamos que el CP no existe.
   return { ok: false, reason: unavailable ? "unavailable" : "notfound" };
 }
