@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getUserFromRequest } from "@/lib/auth-server";
+import { lookupCp } from "@/lib/postal";
 import {
   LOCAL_COVERAGE_TEXT,
   SHIPPING_OPTIONS,
@@ -113,11 +114,23 @@ export async function POST(req: Request) {
       }
       customer.city = city; // nombre oficial, sin variaciones de escritura
 
-      if (!pin) {
-        return fail("Marca tu domicilio en el mapa para la entrega local");
+      // El código postal se verifica contra SEPOMEX cuando el servicio responde.
+      const cpResult = await lookupCp(customer.postal_code);
+      if (cpResult.ok && !matchLocalCity(cpResult.info.municipio)) {
+        return fail(
+          `Ese código postal es de ${cpResult.info.municipio}. La entrega local es válida únicamente en Chalco e Ixtapaluca. Elige paquetería para otras zonas.`
+        );
       }
-      if (!isInsideLocalZone(pin)) {
-        return fail("El punto marcado está fuera de nuestra zona de entrega local (Chalco e Ixtapaluca)");
+
+      if (pin) {
+        if (!isInsideLocalZone(pin)) {
+          return fail("El punto marcado está fuera de nuestra zona de entrega local (Chalco e Ixtapaluca)");
+        }
+      } else if (!cpResult.ok) {
+        // Sin pin y sin poder verificar el CP no hay forma segura de confirmar la zona.
+        return fail(
+          "No pudimos verificar tu código postal. Marca tu ubicación en el mapa para la entrega local."
+        );
       }
     } else if (pin && !isInsideMexico(pin)) {
       return fail("El punto marcado en el mapa debe estar dentro de México");

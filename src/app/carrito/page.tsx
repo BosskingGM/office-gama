@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 import {
   AlertCircle,
   Lock,
+  MapPin,
   Minus,
   Plus,
   ShoppingBag,
@@ -14,10 +15,13 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/context/CartContext";
-import LocationPicker from "@/components/LocationPicker";
-import { STORE_ADDRESS_SHORT, STORE_PICKUP_DATA } from "@/lib/store";
+import AddressFields, {
+  type AddrErrors,
+  type AddrValue,
+} from "@/components/AddressFields";
+import { STORE_MAPS_URL, STORE_PICKUP_DATA } from "@/lib/store";
+import { joinAddress, splitAddress, norm } from "@/lib/address";
 import {
-  LOCAL_CITIES,
   LOCAL_COVERAGE_TEXT,
   SHIPPING_OPTIONS,
   isInsideLocalZone,
@@ -31,21 +35,16 @@ const money = (n: number) =>
   n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 
 const SHIPPING_NOTES: Record<ShippingType, string> = {
-  pickup: STORE_ADDRESS_SHORT,
+  pickup: "Retiro en nuestro local",
   local: `${LOCAL_COVERAGE_TEXT} · costo fijo`,
   paqueteria: "Envío a todo México",
 };
 
 const FORM_KEY = "officegama_checkout_form";
 
-type FormState = {
+type FormState = AddrValue & {
   full_name: string;
   phone: string;
-  address: string;
-  city: string;
-  postal_code: string;
-  latitude: number | null;
-  longitude: number | null;
 };
 type Errors = Partial<Record<keyof FormState | "location", string>>;
 
@@ -54,9 +53,12 @@ type SavedAddress = {
   label: string;
   full_name: string;
   phone: string;
-  address: string;
+  address: string; // texto completo: "Calle y número, Col. Colonia"
+  colonia: string | null;
   city: string;
   postal_code: string;
+  latitude: number | null;
+  longitude: number | null;
   is_default: boolean;
 };
 
@@ -64,11 +66,30 @@ const EMPTY: FormState = {
   full_name: "",
   phone: "",
   address: "",
+  colonia: "",
   city: "",
   postal_code: "",
   latitude: null,
   longitude: null,
+  cp_city: null,
+  mode: "manual",
 };
+
+// Convierte una dirección guardada en los campos del formulario.
+function fromSaved(a: SavedAddress): Omit<FormState, "full_name" | "phone"> {
+  const { street, colonia } = splitAddress(a.address, a.colonia);
+  const hasPin = a.latitude !== null && a.longitude !== null;
+  return {
+    address: street,
+    colonia,
+    city: a.city,
+    postal_code: a.postal_code,
+    latitude: hasPin ? a.latitude : null,
+    longitude: hasPin ? a.longitude : null,
+    cp_city: null, // se vuelve a consultar al mostrar el CP
+    mode: hasPin ? "mapa" : "manual",
+  };
+}
 
 // Mismas reglas que el servidor (create-checkout-session)
 function validate(f: FormState, shippingType: ShippingType): Errors {
@@ -78,7 +99,8 @@ function validate(f: FormState, shippingType: ShippingType): Errors {
   if (f.phone.replace(/\D/g, "").length < 10)
     e.phone = "Escribe un teléfono de 10 dígitos";
   if (needsAddress) {
-    if (!f.address.trim()) e.address = "Escribe tu dirección";
+    if (!f.address.trim()) e.address = "Escribe tu calle y número";
+    if (!f.colonia.trim()) e.colonia = "Elige o escribe tu colonia";
     if (!f.city.trim()) e.city = "Escribe tu ciudad";
     if (!/^\d{5}$/.test(f.postal_code))
       e.postal_code = "El código postal tiene 5 dígitos";
@@ -91,9 +113,18 @@ function validate(f: FormState, shippingType: ShippingType): Errors {
     if (shippingType === "local") {
       if (!matchLocalCity(f.city))
         e.city = `La entrega local es ${LOCAL_COVERAGE_TEXT.toLowerCase()}`;
-      if (!pin) e.location = "Marca tu domicilio en el mapa para la entrega local";
-      else if (!isInsideLocalZone(pin))
-        e.location = "El pin está fuera de nuestra zona de entrega local (Chalco e Ixtapaluca)";
+
+      if (f.cp_city && !matchLocalCity(f.cp_city)) {
+        e.postal_code = "Ese código postal no es de Chalco ni Ixtapaluca";
+      }
+      if (pin) {
+        if (!isInsideLocalZone(pin))
+          e.location = "El pin está fuera de nuestra zona de entrega local (Chalco e Ixtapaluca)";
+      } else if (!(f.cp_city && matchLocalCity(f.cp_city)) && !e.postal_code) {
+        // Sin pin, el código postal debe poder verificarse como Chalco/Ixtapaluca.
+        e.postal_code =
+          "No pudimos verificar tu código postal. Revisa que sea de Chalco o Ixtapaluca, o márcalo en el mapa";
+      }
     } else if (pin && !isInsideMexico(pin)) {
       e.location = "El pin debe estar dentro de México";
     }
@@ -140,7 +171,7 @@ export default function CarritoPage() {
       const [addrRes, detRes] = await Promise.all([
         supabase
           .from("addresses")
-          .select("id, label, full_name, phone, address, city, postal_code, is_default")
+          .select("*")
           .eq("user_id", user.id)
           .order("is_default", { ascending: false })
           .order("created_at", { ascending: true }),
@@ -155,15 +186,16 @@ export default function CarritoPage() {
       setSaved(list);
       const def = list[0]; // la predeterminada va primero
       // Solo se llenan los campos que estén vacíos: no pisa lo que ya escribió
-      setForm((f) => ({
-        full_name: f.full_name || def?.full_name || detRes.data?.full_name || "",
-        phone: f.phone || def?.phone || detRes.data?.phone || "",
-        address: f.address || def?.address || "",
-        city: f.city || def?.city || "",
-        postal_code: f.postal_code || def?.postal_code || "",
-        latitude: f.latitude,
-        longitude: f.longitude,
-      }));
+      setForm((f) => {
+        const d = def ? fromSaved(def) : null;
+        const empty = !f.address && !f.postal_code && !f.city;
+        return {
+          ...f,
+          full_name: f.full_name || def?.full_name || detRes.data?.full_name || "",
+          phone: f.phone || def?.phone || detRes.data?.phone || "",
+          ...(empty && d ? d : {}),
+        };
+      });
     })();
     return () => {
       alive = false;
@@ -205,22 +237,29 @@ export default function CarritoPage() {
     });
   }, [hydrated]);
 
-  const setField = (
-    key: "full_name" | "phone" | "address" | "city" | "postal_code",
-    value: string
-  ) => {
-    setForm((f) => ({ ...f, [key]: value }));
-    if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
+  const patchForm = (patch: Partial<FormState>) => {
+    setForm((f) => ({ ...f, ...patch }));
+    setErrors((e) => {
+      const next = { ...e };
+      for (const k of Object.keys(patch) as (keyof FormState)[]) delete next[k];
+      if ("latitude" in patch || "mode" in patch) delete next.location;
+      return next;
+    });
   };
 
-  const setPin = (p: LatLng | null) => {
-    setForm((f) => ({
-      ...f,
-      latitude: p ? p.lat : null,
-      longitude: p ? p.lng : null,
-    }));
-    if (errors.location) setErrors((e) => ({ ...e, location: undefined }));
-  };
+  // Dirección guardada que coincide con lo que hay en el formulario (para el selector).
+  const selectedSavedId =
+    saved.find((a) => {
+      const s = fromSaved(a);
+      return (
+        a.full_name === form.full_name &&
+        a.phone === form.phone &&
+        s.address === form.address &&
+        norm(s.colonia) === norm(form.colonia) &&
+        norm(a.city) === norm(form.city) &&
+        a.postal_code === form.postal_code
+      );
+    })?.id ?? "";
 
   const chooseShipping = (key: ShippingType) => {
     setShippingType(key);
@@ -277,7 +316,7 @@ export default function CarritoPage() {
         ? {
             full_name: form.full_name.trim(),
             phone: form.phone.trim(),
-            address: form.address.trim(),
+            address: joinAddress(form.address, form.colonia),
             city: form.city.trim(),
             postal_code: form.postal_code,
             latitude: form.latitude,
@@ -518,18 +557,14 @@ export default function CarritoPage() {
                   </label>
                   <select
                     id="saved_address"
-                    value=""
+                    value={selectedSavedId}
                     onChange={(e) => {
                       const a = saved.find((x) => x.id === e.target.value);
                       if (!a) return;
                       setForm({
                         full_name: a.full_name,
                         phone: a.phone,
-                        address: a.address,
-                        city: a.city,
-                        postal_code: a.postal_code,
-                        latitude: null,
-                        longitude: null,
+                        ...fromSaved(a),
                       });
                       setErrors({});
                     }}
@@ -539,6 +574,9 @@ export default function CarritoPage() {
                     {saved.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.label} · {a.address}, {a.city}
+                        {shippingType === "local" && !matchLocalCity(a.city)
+                          ? " (fuera de zona local)"
+                          : ""}
                       </option>
                     ))}
                   </select>
@@ -554,7 +592,7 @@ export default function CarritoPage() {
                     id="full_name"
                     autoComplete="name"
                     value={form.full_name}
-                    onChange={(e) => setField("full_name", e.target.value)}
+                    onChange={(e) => patchForm({ full_name: e.target.value })}
                     aria-invalid={!!errors.full_name}
                     aria-describedby={errors.full_name ? "err-full_name" : undefined}
                     className={fieldClass("full_name")}
@@ -573,7 +611,7 @@ export default function CarritoPage() {
                     autoComplete="tel"
                     placeholder="10 dígitos"
                     value={form.phone}
-                    onChange={(e) => setField("phone", e.target.value)}
+                    onChange={(e) => patchForm({ phone: e.target.value })}
                     aria-invalid={!!errors.phone}
                     aria-describedby={errors.phone ? "err-phone" : undefined}
                     className={fieldClass("phone")}
@@ -598,101 +636,38 @@ export default function CarritoPage() {
                         .
                       </p>
                     )}
-                    <div className="sm:col-span-2">
-                      <label htmlFor="address" className="text-sm font-medium mb-1.5 block">
-                        Dirección
-                      </label>
-                      <input
-                        id="address"
-                        autoComplete="street-address"
-                        placeholder="Calle, número, colonia"
-                        value={form.address}
-                        onChange={(e) => setField("address", e.target.value)}
-                        aria-invalid={!!errors.address}
-                        aria-describedby={errors.address ? "err-address" : undefined}
-                        className={fieldClass("address")}
-                      />
-                      <Err k="address" />
-                    </div>
 
-                    <div>
-                      <label htmlFor="city" className="text-sm font-medium mb-1.5 block">
-                        Ciudad
-                      </label>
-                      {shippingType === "local" ? (
-                        <select
-                          id="city"
-                          value={matchLocalCity(form.city) ?? ""}
-                          onChange={(e) => setField("city", e.target.value)}
-                          aria-invalid={!!errors.city}
-                          aria-describedby={errors.city ? "err-city" : undefined}
-                          className={fieldClass("city")}
-                        >
-                          <option value="">Elige tu municipio…</option>
-                          {LOCAL_CITIES.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          id="city"
-                          autoComplete="address-level2"
-                          value={form.city}
-                          onChange={(e) => setField("city", e.target.value)}
-                          aria-invalid={!!errors.city}
-                          aria-describedby={errors.city ? "err-city" : undefined}
-                          className={fieldClass("city")}
-                        />
-                      )}
-                      <Err k="city" />
-                    </div>
-
-                    <div>
-                      <label htmlFor="postal_code" className="text-sm font-medium mb-1.5 block">
-                        Código postal
-                      </label>
-                      <input
-                        id="postal_code"
-                        inputMode="numeric"
-                        autoComplete="postal-code"
-                        maxLength={5}
-                        value={form.postal_code}
-                        onChange={(e) =>
-                          setField("postal_code", e.target.value.replace(/\D/g, ""))
-                        }
-                        aria-invalid={!!errors.postal_code}
-                        aria-describedby={errors.postal_code ? "err-postal_code" : undefined}
-                        className={fieldClass("postal_code")}
-                      />
-                      <Err k="postal_code" />
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <LocationPicker
-                        key={shippingType}
-                        zone={shippingType === "local" ? "local" : "mexico"}
-                        value={
-                          form.latitude !== null && form.longitude !== null
-                            ? { lat: form.latitude, lng: form.longitude }
-                            : null
-                        }
-                        onChange={setPin}
-                        error={errors.location}
-                      />
-                      {shippingType === "paqueteria" && (
-                        <p className="text-xs text-muted mt-1.5">
-                          Opcional: ayuda a que la paquetería ubique tu domicilio con más precisión.
-                        </p>
-                      )}
-                    </div>
+                    <AddressFields
+                      key={shippingType}
+                      idPrefix="envio"
+                      zone={shippingType === "local" ? "local" : "mexico"}
+                      value={form}
+                      onChange={patchForm}
+                      errors={errors as AddrErrors}
+                      onSwitchToParcel={() => chooseShipping("paqueteria")}
+                    />
+                    {shippingType === "paqueteria" && (
+                      <p className="sm:col-span-2 text-xs text-muted -mt-2">
+                        El pin en el mapa es opcional: ayuda a que la paquetería ubique tu domicilio con más precisión.
+                      </p>
+                    )}
                   </>
                 ) : (
-                  <p className="sm:col-span-2 text-sm text-neutral-600 bg-peach-soft border border-peach rounded-xl px-4 py-3">
-                    Recogerás tu pedido en {STORE_ADDRESS_SHORT}.
-                    Te avisaremos cuando esté listo.
-                  </p>
+                  <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-600 bg-peach-soft border border-peach rounded-xl px-4 py-3">
+                    <p>
+                      Recogerás tu pedido en nuestra tienda. Te avisaremos cuando
+                      esté listo.
+                    </p>
+                    <a
+                      href={STORE_MAPS_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 font-semibold text-brand-strong bg-white border border-peach rounded-full px-4 py-2 hover:bg-brand-soft transition shrink-0"
+                    >
+                      <MapPin size={16} aria-hidden="true" />
+                      Ver ubicación
+                    </a>
+                  </div>
                 )}
               </div>
             </div>

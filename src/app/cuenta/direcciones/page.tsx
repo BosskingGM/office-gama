@@ -13,26 +13,28 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import AddressFields, { type AddrValue } from "@/components/AddressFields";
+import { joinAddress, splitAddress } from "@/lib/address";
 
 type Address = {
   id: string;
   label: string;
   full_name: string;
   phone: string;
-  address: string;
+  address: string; // "Calle y número, Col. Colonia"
+  colonia: string | null;
   city: string;
   postal_code: string;
+  latitude: number | null;
+  longitude: number | null;
   is_default: boolean;
 };
 
-type Form = {
+type Form = AddrValue & {
   id: string | null;
   label: string;
   full_name: string;
   phone: string;
-  address: string;
-  city: string;
-  postal_code: string;
   is_default: boolean;
 };
 
@@ -45,8 +47,13 @@ const EMPTY: Form = {
   full_name: "",
   phone: "",
   address: "",
+  colonia: "",
   city: "",
   postal_code: "",
+  latitude: null,
+  longitude: null,
+  cp_city: null,
+  mode: "manual",
   is_default: false,
 };
 
@@ -112,7 +119,23 @@ export default function DireccionesPage() {
 
   const openEdit = (a: Address) => {
     setFormError("");
-    setForm({ ...a });
+    const { street, colonia } = splitAddress(a.address, a.colonia);
+    const hasPin = a.latitude !== null && a.longitude !== null;
+    setForm({
+      id: a.id,
+      label: a.label,
+      full_name: a.full_name,
+      phone: a.phone,
+      address: street,
+      colonia,
+      city: a.city,
+      postal_code: a.postal_code,
+      latitude: hasPin ? a.latitude : null,
+      longitude: hasPin ? a.longitude : null,
+      cp_city: null,
+      mode: hasPin ? "mapa" : "manual",
+      is_default: a.is_default,
+    });
   };
 
   const save = async () => {
@@ -123,18 +146,26 @@ export default function DireccionesPage() {
       label: form.label.trim() || "Casa",
       full_name: form.full_name.trim(),
       phone: form.phone.trim(),
-      address: form.address.trim(),
+      address: joinAddress(form.address, form.colonia),
+      colonia: form.colonia.trim() || null,
       city: form.city.trim(),
       postal_code: form.postal_code.trim(),
+      latitude: form.mode === "mapa" ? form.latitude : null,
+      longitude: form.mode === "mapa" ? form.longitude : null,
     };
 
     if (!row.full_name) return setFormError("Escribe el nombre de quien recibe.");
     if (row.phone.replace(/\D/g, "").length < 10)
       return setFormError("El teléfono debe tener 10 dígitos.");
-    if (!row.address) return setFormError("Escribe la calle, número y colonia.");
-    if (!row.city) return setFormError("Escribe la ciudad.");
     if (!/^\d{5}$/.test(row.postal_code))
       return setFormError("El código postal tiene 5 dígitos.");
+    if (!row.colonia) return setFormError("Elige o escribe la colonia.");
+    if (!form.address.trim()) return setFormError("Escribe la calle y el número.");
+    if (!row.city) return setFormError("Escribe la ciudad o municipio.");
+    if (form.mode === "mapa" && row.latitude === null)
+      return setFormError(
+        "Marca el punto en el mapa, o cambia a “Escribir dirección”."
+      );
 
     setSaving(true);
     try {
@@ -157,8 +188,13 @@ export default function DireccionesPage() {
       }
       setForm(null);
       await load();
-    } catch {
-      setFormError("No pudimos guardar la dirección. Intenta de nuevo.");
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? "";
+      setFormError(
+        /colonia|latitude|longitude|schema cache/i.test(msg)
+          ? "Falta ejecutar supabase/address-colonia.sql en Supabase para guardar colonia y ubicación."
+          : "No pudimos guardar la dirección. Intenta de nuevo."
+      );
     } finally {
       setSaving(false);
     }
@@ -378,52 +414,12 @@ export default function DireccionesPage() {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="a-addr" className="text-sm font-medium mb-1.5 block">
-                    Dirección
-                  </label>
-                  <input
-                    id="a-addr"
-                    autoComplete="street-address"
-                    placeholder="Calle, número, colonia"
-                    value={form.address}
-                    onChange={(e) => patch({ address: e.target.value })}
-                    maxLength={300}
-                    className="field"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="a-city" className="text-sm font-medium mb-1.5 block">
-                      Ciudad
-                    </label>
-                    <input
-                      id="a-city"
-                      autoComplete="address-level2"
-                      value={form.city}
-                      onChange={(e) => patch({ city: e.target.value })}
-                      maxLength={100}
-                      className="field"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="a-cp" className="text-sm font-medium mb-1.5 block">
-                      Código postal
-                    </label>
-                    <input
-                      id="a-cp"
-                      inputMode="numeric"
-                      autoComplete="postal-code"
-                      maxLength={5}
-                      value={form.postal_code}
-                      onChange={(e) =>
-                        patch({ postal_code: e.target.value.replace(/\D/g, "") })
-                      }
-                      className="field"
-                    />
-                  </div>
-                </div>
+                <AddressFields
+                  idPrefix="dir"
+                  zone="mexico"
+                  value={form}
+                  onChange={patch}
+                />
 
                 <label className="flex items-center gap-2.5 text-sm cursor-pointer select-none">
                   <input
