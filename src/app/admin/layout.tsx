@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Megaphone,
   Package,
+  ShieldCheck,
   Store,
   Ticket,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const LINKS = [
   { href: "/admin/inventario", label: "Inventario", icon: Package },
   { href: "/admin/promociones", label: "Promociones", icon: Megaphone },
   { href: "/admin/cupones", label: "Cupones", icon: Ticket },
+  { href: "/admin/administradores", label: "Administradores", icon: ShieldCheck },
 ];
 
 export default function AdminLayout({

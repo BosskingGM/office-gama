@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { revalidateStore } from "@/lib/revalidate-client";
+import InventoryExcel from "@/components/InventoryExcel";
 
 /* =========================
    TIPOS Y CONSTANTES
@@ -777,10 +778,20 @@ export default function InventarioPage() {
                 }`}
           </p>
         </div>
-        <button type="button" onClick={openNew} className="btn-primary">
-          <Plus size={18} aria-hidden="true" />
-          Nuevo producto
-        </button>
+        <div className="flex items-center gap-2">
+          <InventoryExcel
+            products={products}
+            categories={CATEGORIES}
+            onDone={(text) => {
+              setNotice({ kind: "ok", text });
+              loadProducts();
+            }}
+          />
+          <button type="button" onClick={openNew} className="btn-primary">
+            <Plus size={18} aria-hidden="true" />
+            Nuevo producto
+          </button>
+        </div>
       </div>
 
       {/* Aviso */}
