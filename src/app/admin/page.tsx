@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import StatusBadge from "@/components/StatusBadge";
+import InventoryReport from "@/components/InventoryReport";
 
 /* =========================
    TIPOS Y AYUDAS
@@ -458,6 +459,9 @@ export default function AdminDashboard() {
           </ul>
         )}
       </section>
+
+      {/* Reporte de inventario y ventas */}
+      <InventoryReport />
     </div>
   );
 }
