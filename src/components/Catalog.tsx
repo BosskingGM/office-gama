@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Search, SearchX, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowUp, Loader2, Search, SearchX, X } from "lucide-react";
 import ProductCard from "@/components/ProductCard";
 
 type Variant = { id: string; image_url?: string | null; stock?: number | null };
@@ -14,6 +14,8 @@ type Product = {
 };
 
 const PAGE_SIZE = 12;
+const AUTO_KEY = "og-catalog-auto"; // recuerda si el cliente prefiere el botón
+const TOP_AFTER = 700; // px de scroll para mostrar la flecha de "subir"
 
 const SORTS = {
   default: "Destacados",
@@ -51,6 +53,36 @@ export default function Catalog({ products }: { products: Product[] }) {
   const [priceKey, setPriceKey] = useState<string>("all");
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [visible, setVisible] = useState(PAGE_SIZE);
+  const [auto, setAuto] = useState(true); // carga automática al hacer scroll
+  const [showTop, setShowTop] = useState(false);
+  const [topClosed, setTopClosed] = useState(false); // el cliente cerró la flecha
+  const sentinel = useRef<HTMLDivElement>(null);
+
+  // Recuerda la preferencia (si el navegador no deja guardar, no pasa nada)
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(AUTO_KEY) === "0") setAuto(false);
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, []);
+
+  const toggleAuto = (v: boolean) => {
+    setAuto(v);
+    try {
+      localStorage.setItem(AUTO_KEY, v ? "1" : "0");
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
+
+  // Flecha "subir": aparece cuando se ha bajado bastante
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > TOP_AFTER);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   // Solo categorías que sí tienen productos, con su conteo
   const categories = useMemo(() => {
@@ -86,6 +118,23 @@ export default function Catalog({ products }: { products: Product[] }) {
   }, [products, search, category, sort, priceKey, onlyAvailable]);
 
   const shown = filtered.slice(0, visible);
+  const hasMore = filtered.length > shown.length;
+
+  // Scroll infinito: al acercarse al final de la lista carga otra tanda.
+  // Se vuelve a crear con cada tanda para revisar si todavía hay espacio.
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!auto || !hasMore || !el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting))
+          setVisible((v) => v + PAGE_SIZE);
+      },
+      { rootMargin: "600px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [auto, hasMore, visible]);
   const hasFilters =
     !!search || !!category || priceKey !== "all" || onlyAvailable;
 
@@ -223,17 +272,71 @@ export default function Catalog({ products }: { products: Product[] }) {
             ))}
           </div>
 
-          {filtered.length > shown.length && (
-            <div className="text-center pt-4">
-              <button
-                onClick={() => setVisible((v) => v + PAGE_SIZE)}
-                className="btn-outline px-8"
-              >
-                Mostrar más ({filtered.length - shown.length} restantes)
-              </button>
+          {hasMore ? (
+            <div className="text-center pt-4 space-y-2">
+              {auto ? (
+                <>
+                  <div
+                    ref={sentinel}
+                    className="flex items-center justify-center gap-2 text-sm text-muted h-10"
+                  >
+                    <Loader2 size={16} className="animate-spin" /> Cargando más
+                    productos…
+                  </div>
+                  <button
+                    onClick={() => toggleAuto(false)}
+                    className="text-xs text-muted hover:underline"
+                  >
+                    Prefiero el botón &quot;Mostrar más&quot;
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setVisible((v) => v + PAGE_SIZE)}
+                    className="btn-outline px-8"
+                  >
+                    Mostrar más ({filtered.length - shown.length} restantes)
+                  </button>
+                  <div>
+                    <button
+                      onClick={() => toggleAuto(true)}
+                      className="text-xs text-muted hover:underline"
+                    >
+                      Cargar automático al bajar
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
+          ) : (
+            shown.length > PAGE_SIZE && (
+              <p className="text-center text-sm text-muted pt-4">
+                Ya viste todos los productos 🎉
+              </p>
+            )
           )}
         </>
+      )}
+
+      {/* Flecha para volver arriba (se puede cerrar con la X) */}
+      {showTop && !topClosed && (
+        <div className="fixed right-4 bottom-5 z-40 flex items-center gap-1.5">
+          <button
+            onClick={() => setTopClosed(true)}
+            aria-label="Cerrar flecha de subir"
+            className="w-7 h-7 grid place-items-center rounded-full bg-white/90 border border-line text-muted shadow hover:bg-white"
+          >
+            <X size={14} />
+          </button>
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            aria-label="Volver arriba"
+            className="w-12 h-12 grid place-items-center rounded-full bg-brand text-ink shadow-lg hover:bg-brand-hover transition"
+          >
+            <ArrowUp size={22} />
+          </button>
+        </div>
       )}
 
       {/* Estilos de las categorías (chips) */}
