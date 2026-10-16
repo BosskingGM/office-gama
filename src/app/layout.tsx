@@ -41,12 +41,11 @@ export const metadata: Metadata = {
     title: "Office GaMa | Papelería importada en México",
     description:
       "Papelería importada con diseños únicos. Envíos a todo México.",
-    images: [{ url: "/logo2.png", width: 640, height: 341 }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Office GaMa" }],
   },
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/favicon.ico",
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og.png"],
   },
 };
 
