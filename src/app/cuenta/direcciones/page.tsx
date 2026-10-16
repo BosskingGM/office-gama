@@ -52,7 +52,6 @@ const EMPTY: Form = {
   postal_code: "",
   latitude: null,
   longitude: null,
-  cp_city: null,
   mode: "manual",
   is_default: false,
 };
@@ -132,7 +131,6 @@ export default function DireccionesPage() {
       postal_code: a.postal_code,
       latitude: hasPin ? a.latitude : null,
       longitude: hasPin ? a.longitude : null,
-      cp_city: null,
       mode: hasPin ? "mapa" : "manual",
       is_default: a.is_default,
     });
@@ -159,7 +157,7 @@ export default function DireccionesPage() {
       return setFormError("El teléfono debe tener 10 dígitos.");
     if (!/^\d{5}$/.test(row.postal_code))
       return setFormError("El código postal tiene 5 dígitos.");
-    if (!row.colonia) return setFormError("Elige o escribe la colonia.");
+    if (!row.colonia) return setFormError("Escribe la colonia.");
     if (!form.address.trim()) return setFormError("Escribe la calle y el número.");
     if (!row.city) return setFormError("Escribe la ciudad o municipio.");
     if (form.mode === "mapa" && row.latitude === null)

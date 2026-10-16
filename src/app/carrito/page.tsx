@@ -72,7 +72,6 @@ const EMPTY: FormState = {
   postal_code: "",
   latitude: null,
   longitude: null,
-  cp_city: null,
   mode: "manual",
 };
 
@@ -87,7 +86,6 @@ function fromSaved(a: SavedAddress): Omit<FormState, "full_name" | "phone"> {
     postal_code: a.postal_code,
     latitude: hasPin ? a.latitude : null,
     longitude: hasPin ? a.longitude : null,
-    cp_city: null, // se vuelve a consultar al mostrar el CP
     mode: hasPin ? "mapa" : "manual",
   };
 }
@@ -101,7 +99,7 @@ function validate(f: FormState, shippingType: ShippingType): Errors {
     e.phone = "Escribe un teléfono de 10 dígitos";
   if (needsAddress) {
     if (!f.address.trim()) e.address = "Escribe tu calle y número";
-    if (!f.colonia.trim()) e.colonia = "Elige o escribe tu colonia";
+    if (!f.colonia.trim()) e.colonia = "Escribe tu colonia";
     if (!f.city.trim()) e.city = "Escribe tu ciudad";
     if (!/^\d{5}$/.test(f.postal_code))
       e.postal_code = "El código postal tiene 5 dígitos";
@@ -115,14 +113,11 @@ function validate(f: FormState, shippingType: ShippingType): Errors {
       if (!matchLocalCity(f.city))
         e.city = `La entrega local es ${LOCAL_COVERAGE_TEXT.toLowerCase()}`;
 
-      if (f.cp_city && !matchLocalCity(f.cp_city)) {
-        e.postal_code = "Ese código postal no es de Chalco ni Ixtapaluca";
-      }
       if (pin) {
         if (!isInsideLocalZone(pin))
           e.location = "El pin está fuera de nuestra zona de entrega local (Chalco e Ixtapaluca)";
-      } else if (!f.cp_city && !isLocalCpRange(f.postal_code) && !e.postal_code) {
-        // Sin pin ni municipio confirmado, el CP debe estar en el rango local.
+      } else if (!isLocalCpRange(f.postal_code) && !e.postal_code) {
+        // Sin pin, el CP debe estar en el rango de Chalco/Ixtapaluca.
         e.postal_code =
           "Ese código postal no parece de Chalco ni Ixtapaluca. Revísalo o márcalo en el mapa";
       }

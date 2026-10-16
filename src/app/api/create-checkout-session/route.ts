@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getUserFromRequest } from "@/lib/auth-server";
-import { lookupCp } from "@/lib/postal";
 import {
   LOCAL_COVERAGE_TEXT,
   SHIPPING_OPTIONS,
@@ -115,30 +114,15 @@ export async function POST(req: Request) {
       }
       customer.city = city; // nombre oficial, sin variaciones de escritura
 
-      // El código postal se verifica contra SEPOMEX cuando el servicio responde.
-      const cpResult = await lookupCp(customer.postal_code);
-      if (!cpResult.ok && cpResult.reason === "notfound") {
-        return fail("No encontramos ese código postal. Revísalo e intenta de nuevo.");
-      }
-      if (cpResult.ok && cpResult.info.municipio && !matchLocalCity(cpResult.info.municipio)) {
-        return fail(
-          `Ese código postal es de ${cpResult.info.municipio}. La entrega local es válida únicamente en Chalco e Ixtapaluca. Elige paquetería para otras zonas.`
-        );
-      }
-
       if (pin) {
         if (!isInsideLocalZone(pin)) {
           return fail("El punto marcado está fuera de nuestra zona de entrega local (Chalco e Ixtapaluca)");
         }
-      } else {
-        // Sin pin: el municipio confirmado por SEPOMEX, o (si el servicio no lo da
-        // o está caído) que el CP esté en el rango de Chalco/Ixtapaluca.
-        const confirmed = cpResult.ok && !!cpResult.info.municipio;
-        if (!confirmed && !isLocalCpRange(customer.postal_code)) {
-          return fail(
-            "Ese código postal no parece de Chalco ni Ixtapaluca. Marca tu ubicación en el mapa o elige paquetería."
-          );
-        }
+      } else if (!isLocalCpRange(customer.postal_code)) {
+        // Sin pin, el CP debe estar en el rango de Chalco/Ixtapaluca.
+        return fail(
+          "Ese código postal no parece de Chalco ni Ixtapaluca. Marca tu ubicación en el mapa o elige paquetería."
+        );
       }
     } else if (pin && !isInsideMexico(pin)) {
       return fail("El punto marcado en el mapa debe estar dentro de México");

@@ -29,11 +29,4 @@ export function splitAddress(
   return { street: address, colonia: c };
 }
 
-export type PostalInfo = {
-  cp: string;
-  municipio: string;
-  estado: string;
-  colonias: string[];
-};
-
 export type AddressMode = "manual" | "mapa";

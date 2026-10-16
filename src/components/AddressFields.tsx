@@ -1,15 +1,15 @@
 "use client";
 
 // Captura de dirección con dos caminos:
-//   • "Escribir dirección": código postal → aparecen las colonias de ese CP.
+//   • "Escribir dirección": CP, colonia, municipio y calle, todo a mano.
 //   • "Marcar en el mapa": pin (o ubicación actual); al marcarlo se intenta
 //     rellenar calle, CP y colonia, y el cliente puede corregirlos.
 // Lo usan el carrito y /cuenta/direcciones, para que se comporten igual.
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2, MapPin, PenLine } from "lucide-react";
 import LocationPicker from "@/components/LocationPicker";
-import { norm, type AddressMode, type PostalInfo } from "@/lib/address";
+import type { AddressMode } from "@/lib/address";
 import {
   LOCAL_CITIES,
   LOCAL_COVERAGE_TEXT,
@@ -25,8 +25,6 @@ export type AddrValue = {
   postal_code: string;
   latitude: number | null;
   longitude: number | null;
-  /** Municipio que devolvió la consulta del CP (para validar entrega local). */
-  cp_city: string | null;
   mode: AddressMode;
 };
 
@@ -41,24 +39,9 @@ type Props = {
   zone: "local" | "mexico";
   errors?: AddrErrors;
   idPrefix: string;
-  /** Si la zona es local y el CP no lo es, ofrece pasarse a paquetería. */
+  /** Si la zona es local, ofrece pasarse a paquetería. */
   onSwitchToParcel?: () => void;
 };
-
-type Lookup = "idle" | "loading" | "ok" | "notfound" | "error";
-
-const clientCache = new Map<string, PostalInfo>();
-
-function matchColonia(options: string[], wanted: string): string {
-  const w = norm(wanted);
-  if (w.length < 3) return "";
-  const exact = options.find((o) => norm(o) === w);
-  if (exact) return exact;
-  return options.find((o) => {
-    const n = norm(o);
-    return n.length >= 4 && (n.includes(w) || w.includes(n));
-  }) ?? "";
-}
 
 export default function AddressFields({
   value,
@@ -66,7 +49,6 @@ export default function AddressFields({
   zone,
   errors = {},
   idPrefix,
-  onSwitchToParcel,
 }: Props) {
   const local = zone === "local";
   const valueRef = useRef(value);
@@ -74,13 +56,6 @@ export default function AddressFields({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  const [status, setStatus] = useState<Lookup>("idle");
-  const [info, setInfo] = useState<PostalInfo | null>(null);
-  const infoRef = useRef<PostalInfo | null>(null);
-
-  // true cuando el CP lo cambió la persona (o el mapa): ahí sí se corrige la ciudad/colonia.
-  const autofill = useRef(false);
-  const pendingColonia = useRef(""); // colonia sugerida por el mapa
   const lastAutoStreet = useRef("");
   const geoCount = useRef(0);
   const [geoBusy, setGeoBusy] = useState(false);
@@ -90,84 +65,7 @@ export default function AddressFields({
       ? { lat: value.latitude, lng: value.longitude }
       : null;
 
-  /* ---------- Colonias del código postal ---------- */
-  const cp = value.postal_code;
-  useEffect(() => {
-    if (!/^\d{5}$/.test(cp)) {
-      setStatus("idle");
-      setInfo(null);
-      infoRef.current = null;
-      if (valueRef.current.cp_city) onChangeRef.current({ cp_city: null });
-      return;
-    }
-
-    let alive = true;
-    const apply = (data: PostalInfo) => {
-      if (!alive) return;
-      infoRef.current = data;
-      setInfo(data);
-      setStatus("ok");
-
-      const v = valueRef.current;
-      const patch: Partial<AddrValue> = { cp_city: data.municipio || null };
-
-      if (data.municipio && (autofill.current || !v.city)) {
-        patch.city = local ? matchLocalCity(data.municipio) ?? "" : data.municipio;
-      }
-
-      const current = data.colonias.find((c) => norm(c) === norm(v.colonia));
-      if (current) {
-        patch.colonia = current; // respeta mayúsculas oficiales
-      } else if (pendingColonia.current && matchColonia(data.colonias, pendingColonia.current)) {
-        patch.colonia = matchColonia(data.colonias, pendingColonia.current);
-      } else if (data.colonias.length === 1) {
-        patch.colonia = data.colonias[0];
-      } else if (autofill.current) {
-        patch.colonia = ""; // cambió el CP: la colonia anterior ya no aplica
-      }
-      pendingColonia.current = "";
-      autofill.current = false;
-      onChangeRef.current(patch);
-    };
-
-    const cached = clientCache.get(cp);
-    if (cached) {
-      apply(cached);
-      return () => {
-        alive = false;
-      };
-    }
-
-    setStatus("loading");
-    fetch(`/api/cp/${cp}`)
-      .then(async (res) => {
-        if (!alive) return;
-        if (res.ok) {
-          const data = (await res.json()) as PostalInfo;
-          clientCache.set(cp, data);
-          apply(data);
-        } else {
-          infoRef.current = null;
-          setInfo(null);
-          setStatus(res.status === 404 ? "notfound" : "error");
-          autofill.current = false;
-          if (valueRef.current.cp_city) onChangeRef.current({ cp_city: null });
-        }
-      })
-      .catch(() => {
-        if (!alive) return;
-        infoRef.current = null;
-        setInfo(null);
-        setStatus("error");
-      });
-
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cp]);
-
-  /* ---------- Pin en el mapa → dirección aproximada ---------- */
+  /* Pin en el mapa → dirección aproximada (OpenStreetMap). Siempre editable. */
   const handlePin = async (p: LatLng | null) => {
     onChange({ latitude: p ? p.lat : null, longitude: p ? p.lng : null });
     if (!p) return;
@@ -187,26 +85,19 @@ export default function AddressFields({
       const road = a.road ?? a.pedestrian ?? a.footway ?? "";
       const street = [road, a.house_number].filter(Boolean).join(" ");
       const suburb = a.suburb ?? a.neighbourhood ?? a.quarter ?? a.city_district ?? "";
+      const muni = a.city ?? a.town ?? a.municipality ?? a.village ?? "";
 
       const v = valueRef.current;
       const patch: Partial<AddrValue> = {};
-
       if (street && (!v.address.trim() || v.address === lastAutoStreet.current)) {
         patch.address = street;
         lastAutoStreet.current = street;
       }
-      if (postcode) {
-        pendingColonia.current = suburb;
-        autofill.current = true;
-        if (postcode === v.postal_code && infoRef.current) {
-          // Mismo CP: no se vuelve a consultar, se elige la colonia aquí.
-          const m = matchColonia(infoRef.current.colonias, suburb);
-          if (m) patch.colonia = m;
-          pendingColonia.current = "";
-          autofill.current = false;
-        } else {
-          patch.postal_code = postcode;
-        }
+      if (postcode) patch.postal_code = postcode;
+      if (suburb) patch.colonia = suburb;
+      if (muni) {
+        const m = local ? matchLocalCity(muni) : muni;
+        if (m) patch.city = m;
       }
       if (Object.keys(patch).length) onChangeRef.current(patch);
     } catch {
@@ -226,9 +117,6 @@ export default function AddressFields({
     );
   };
 
-  /* ---------- Avisos ---------- */
-  const cpOutsideLocal =
-    local && status === "ok" && info !== null && !!info.municipio && !matchLocalCity(info.municipio);
   const pinOutside = local && pin !== null && !isInsideLocalZone(pin);
 
   const fieldClass = (k: keyof AddrErrors) =>
@@ -258,9 +146,6 @@ export default function AddressFields({
     </button>
   );
 
-  const coloniaOptions = info?.colonias ?? [];
-  const showColoniaSelect = status === "ok" && coloniaOptions.length > 0;
-
   return (
     <div className="sm:col-span-2 space-y-4">
       <div role="radiogroup" aria-label="Cómo capturar la dirección" className="flex gap-2">
@@ -270,12 +155,7 @@ export default function AddressFields({
 
       {value.mode === "mapa" && (
         <div className="space-y-2">
-          <LocationPicker
-            zone={zone}
-            value={pin}
-            onChange={handlePin}
-            error={errors.location}
-          />
+          <LocationPicker zone={zone} value={pin} onChange={handlePin} error={errors.location} />
           {geoBusy && (
             <p className="text-xs text-muted inline-flex items-center gap-1.5">
               <Loader2 size={13} className="animate-spin" aria-hidden="true" />
@@ -307,30 +187,11 @@ export default function AddressFields({
             maxLength={5}
             placeholder="5 dígitos"
             value={value.postal_code}
-            onChange={(e) => {
-              autofill.current = true;
-              onChange({ postal_code: e.target.value.replace(/\D/g, "") });
-            }}
+            onChange={(e) => onChange({ postal_code: e.target.value.replace(/\D/g, "") })}
             aria-invalid={!!errors.postal_code}
             aria-describedby={errors.postal_code ? `${idPrefix}-err-postal_code` : undefined}
             className={fieldClass("postal_code")}
           />
-          {status === "loading" && (
-            <p className="text-xs text-muted mt-1.5 inline-flex items-center gap-1.5">
-              <Loader2 size={13} className="animate-spin" aria-hidden="true" />
-              Buscando colonias…
-            </p>
-          )}
-          {status === "notfound" && !errors.postal_code && (
-            <p className="text-xs text-danger mt-1.5">
-              No encontramos ese código postal. Revisa que esté bien escrito.
-            </p>
-          )}
-          {status === "error" && (
-            <p className="text-xs text-muted mt-1.5">
-              No pudimos cargar las colonias ahora. Escribe la tuya en el campo de colonia.
-            </p>
-          )}
           <Err k="postal_code" />
         </div>
 
@@ -368,63 +229,20 @@ export default function AddressFields({
           <Err k="city" />
         </div>
 
-        {cpOutsideLocal && info && (
-          <p
-            role="alert"
-            className="sm:col-span-2 text-sm text-neutral-700 bg-peach-soft border border-peach rounded-xl px-4 py-3"
-          >
-            Ese código postal es de <strong>{info.municipio}{info.estado ? `, ${info.estado}` : ""}</strong>.
-            La entrega local es {LOCAL_COVERAGE_TEXT.toLowerCase()}.
-            {onSwitchToParcel && (
-              <>
-                {" "}
-                <button type="button" onClick={onSwitchToParcel} className="font-semibold underline">
-                  Usar paquetería nacional
-                </button>
-                .
-              </>
-            )}
-          </p>
-        )}
-
         <div className="sm:col-span-2">
           <label htmlFor={`${idPrefix}-colonia`} className="text-sm font-medium mb-1.5 block">
             Colonia
           </label>
-          {showColoniaSelect ? (
-            <select
-              id={`${idPrefix}-colonia`}
-              value={coloniaOptions.find((c) => norm(c) === norm(value.colonia)) ?? ""}
-              onChange={(e) => onChange({ colonia: e.target.value })}
-              aria-invalid={!!errors.colonia}
-              aria-describedby={errors.colonia ? `${idPrefix}-err-colonia` : undefined}
-              className={fieldClass("colonia")}
-            >
-              <option value="">Elige tu colonia…</option>
-              {coloniaOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          ) : status === "idle" || status === "loading" ? (
-            <select id={`${idPrefix}-colonia`} disabled className="field" value="">
-              <option value="">
-                {status === "loading" ? "Buscando colonias…" : "Primero escribe tu código postal"}
-              </option>
-            </select>
-          ) : (
-            <input
-              id={`${idPrefix}-colonia`}
-              value={value.colonia}
-              onChange={(e) => onChange({ colonia: e.target.value })}
-              placeholder="Nombre de tu colonia"
-              maxLength={100}
-              aria-invalid={!!errors.colonia}
-              aria-describedby={errors.colonia ? `${idPrefix}-err-colonia` : undefined}
-              className={fieldClass("colonia")}
-            />
-          )}
+          <input
+            id={`${idPrefix}-colonia`}
+            value={value.colonia}
+            onChange={(e) => onChange({ colonia: e.target.value })}
+            placeholder="Nombre de tu colonia"
+            maxLength={100}
+            aria-invalid={!!errors.colonia}
+            aria-describedby={errors.colonia ? `${idPrefix}-err-colonia` : undefined}
+            className={fieldClass("colonia")}
+          />
           <Err k="colonia" />
         </div>
 
