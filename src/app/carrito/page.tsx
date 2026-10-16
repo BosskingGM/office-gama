@@ -47,6 +47,17 @@ type FormState = {
 };
 type Errors = Partial<Record<keyof FormState, string>>;
 
+type SavedAddress = {
+  id: string;
+  label: string;
+  full_name: string;
+  phone: string;
+  address: string;
+  city: string;
+  postal_code: string;
+  is_default: boolean;
+};
+
 const EMPTY: FormState = {
   full_name: "",
   phone: "",
@@ -99,6 +110,43 @@ export default function CarritoPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
   }, []);
+
+  /* Direcciones y datos guardados en la cuenta: llenan el formulario vacío */
+  const [saved, setSaved] = useState<SavedAddress[]>([]);
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    (async () => {
+      const [addrRes, detRes] = await Promise.all([
+        supabase
+          .from("addresses")
+          .select("id, label, full_name, phone, address, city, postal_code, is_default")
+          .eq("user_id", user.id)
+          .order("is_default", { ascending: false })
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("customer_details")
+          .select("full_name, phone")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      ]);
+      if (!alive) return;
+      const list = (addrRes.data ?? []) as SavedAddress[];
+      setSaved(list);
+      const def = list[0]; // la predeterminada va primero
+      // Solo se llenan los campos que estén vacíos: no pisa lo que ya escribió
+      setForm((f) => ({
+        full_name: f.full_name || def?.full_name || detRes.data?.full_name || "",
+        phone: f.phone || def?.phone || detRes.data?.phone || "",
+        address: f.address || def?.address || "",
+        city: f.city || def?.city || "",
+        postal_code: f.postal_code || def?.postal_code || "",
+      }));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [user]);
 
   /* Datos de envío recordados en este navegador */
   useEffect(() => {
@@ -403,6 +451,41 @@ export default function CarritoPage() {
               <h3 className="font-semibold mb-4">
                 {needsAddress ? "Datos de entrega" : "Datos de contacto"}
               </h3>
+
+              {saved.length > 0 && (
+                <div className="mb-4">
+                  <label
+                    htmlFor="saved_address"
+                    className="text-sm font-medium mb-1.5 block"
+                  >
+                    Usar una dirección guardada
+                  </label>
+                  <select
+                    id="saved_address"
+                    value=""
+                    onChange={(e) => {
+                      const a = saved.find((x) => x.id === e.target.value);
+                      if (!a) return;
+                      setForm({
+                        full_name: a.full_name,
+                        phone: a.phone,
+                        address: a.address,
+                        city: a.city,
+                        postal_code: a.postal_code,
+                      });
+                      setErrors({});
+                    }}
+                    className="field"
+                  >
+                    <option value="">Elegir una dirección…</option>
+                    {saved.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.label} · {a.address}, {a.city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">

@@ -58,7 +58,7 @@ export default function PedidoPage() {
         <p className="text-sm text-muted">
           Revisa el enlace o entra a tu cuenta para ver tus pedidos.
         </p>
-        <Link href="/cuenta" className="btn-primary">
+        <Link href="/cuenta/pedidos" className="btn-primary">
           Ver mis pedidos
         </Link>
       </div>
@@ -73,7 +73,7 @@ export default function PedidoPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <Link href="/cuenta" className="text-sm text-muted hover:text-brand-strong transition">
+      <Link href="/cuenta/pedidos" className="text-sm text-muted hover:text-brand-strong transition">
         ← Mis pedidos
       </Link>
 

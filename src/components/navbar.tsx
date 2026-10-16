@@ -1,18 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import {
+  ChevronDown,
+  LayoutGrid,
+  Lock,
   LogOut,
+  MapPin,
   Menu,
   Package,
   ShieldCheck,
   ShoppingBag,
+  User as UserIcon,
   X,
 } from "lucide-react";
+import {
+  ACCOUNT_EVENT,
+  fetchFullName,
+  firstName,
+  initialOf,
+} from "@/lib/account";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/context/CartContext";
 import CartDrawer from "@/components/CartDrawer";
@@ -22,6 +33,9 @@ export default function Navbar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const { count, hydrated, openCart } = useCart();
   const pathname = usePathname();
@@ -32,8 +46,10 @@ export default function Navbar() {
     const loadRole = async (u: User | null) => {
       if (!u) {
         setIsAdmin(false);
+        setFullName("");
         return;
       }
+      fetchFullName(u.id).then(setFullName).catch(() => setFullName(""));
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")
@@ -58,6 +74,38 @@ export default function Navbar() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  /* Si el cliente cambia su nombre en "Mis datos", se refleja aquí */
+  useEffect(() => {
+    const refresh = async () => {
+      const { data } = await supabase.auth.getSession();
+      const u = data.session?.user;
+      if (u) setFullName(await fetchFullName(u.id).catch(() => ""));
+    };
+    window.addEventListener(ACCOUNT_EVENT, refresh);
+    return () => window.removeEventListener(ACCOUNT_EVENT, refresh);
+  }, []);
+
+  /* Menú de cuenta: cerrar al tocar fuera, con Escape o al cambiar de página */
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    document.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   /* Sombra al hacer scroll */
   useEffect(() => {
@@ -89,6 +137,8 @@ export default function Navbar() {
     await supabase.auth.signOut();
     setUser(null);
     setIsAdmin(false);
+    setFullName("");
+    setMenuOpen(false);
     setOpen(false);
     router.push("/");
   };
@@ -145,12 +195,6 @@ export default function Navbar() {
               Inicio
             </Link>
 
-            {user && (
-              <Link href="/cuenta" className={linkClass("/cuenta")}>
-                Mis pedidos
-              </Link>
-            )}
-
             {isAdmin && (
               <Link
                 href="/admin"
@@ -164,21 +208,70 @@ export default function Navbar() {
             {cartButton}
 
             {user ? (
-              <div className="flex items-center gap-3 pl-3 border-l border-line">
-                <span
-                  className="text-sm text-neutral-600 max-w-[150px] truncate"
-                  title={user.email ?? ""}
-                >
-                  {user.email}
-                </span>
+              <div
+                ref={menuRef}
+                className="relative pl-3 border-l border-line"
+              >
                 <button
-                  onClick={handleLogout}
-                  aria-label="Cerrar sesión"
-                  title="Cerrar sesión"
-                  className="w-9 h-9 grid place-items-center rounded-full text-neutral-500 hover:text-ink hover:bg-brand-soft transition"
+                  onClick={() => setMenuOpen((v) => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  className="flex items-center gap-2.5 pl-1 pr-2.5 py-1 rounded-full hover:bg-brand-soft transition"
                 >
-                  <LogOut size={18} />
+                  <span className="w-9 h-9 rounded-full bg-brand text-ink grid place-items-center font-bold">
+                    {initialOf(fullName, user.email)}
+                  </span>
+                  <span className="text-sm font-medium max-w-[110px] truncate">
+                    {firstName(fullName) || "Mi cuenta"}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`text-neutral-500 transition ${
+                      menuOpen ? "rotate-180" : ""
+                    }`}
+                  />
                 </button>
+
+                {menuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full mt-3 w-64 card p-2 z-50 animate-fade-up"
+                  >
+                    <div className="px-3 py-2.5 mb-1 border-b border-line">
+                      <p className="font-semibold truncate">
+                        {fullName || "Mi cuenta"}
+                      </p>
+                      <p className="text-xs text-muted truncate">{user.email}</p>
+                    </div>
+                    {[
+                      { href: "/cuenta", label: "Resumen", icon: LayoutGrid },
+                      { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package },
+                      { href: "/cuenta/perfil", label: "Mis datos", icon: UserIcon },
+                      { href: "/cuenta/direcciones", label: "Direcciones", icon: MapPin },
+                      { href: "/cuenta/seguridad", label: "Seguridad", icon: Lock },
+                    ].map(({ href, label, icon: Icon }) => (
+                      <Link
+                        key={href}
+                        href={href}
+                        role="menuitem"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-brand-soft transition"
+                      >
+                        <Icon size={17} className="text-neutral-500" />
+                        {label}
+                      </Link>
+                    ))}
+                    <div className="mt-1 pt-1 border-t border-line">
+                      <button
+                        onClick={handleLogout}
+                        role="menuitem"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-neutral-700 hover:bg-brand-soft transition"
+                      >
+                        <LogOut size={17} className="text-neutral-500" />
+                        Cerrar sesión
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-3">
@@ -242,13 +335,27 @@ export default function Navbar() {
                 Inicio
               </Link>
               {user && (
-                <Link
-                onClick={() => setOpen(false)}
-                  href="/cuenta"
-                  className="px-3 py-3 rounded-xl hover:bg-brand-soft transition flex items-center gap-2"
-                >
-                  <Package size={18} /> Mis pedidos
-                </Link>
+                <>
+                  <p className="px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">
+                    Mi cuenta
+                  </p>
+                  {[
+                    { href: "/cuenta", label: "Resumen", icon: LayoutGrid },
+                    { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package },
+                    { href: "/cuenta/perfil", label: "Mis datos", icon: UserIcon },
+                    { href: "/cuenta/direcciones", label: "Direcciones", icon: MapPin },
+                    { href: "/cuenta/seguridad", label: "Seguridad", icon: Lock },
+                  ].map(({ href, label, icon: Icon }) => (
+                    <Link
+                      key={href}
+                      onClick={() => setOpen(false)}
+                      href={href}
+                      className="px-3 py-3 rounded-xl hover:bg-brand-soft transition flex items-center gap-3"
+                    >
+                      <Icon size={18} className="text-neutral-500" /> {label}
+                    </Link>
+                  ))}
+                </>
               )}
               {isAdmin && (
                 <Link
@@ -264,9 +371,19 @@ export default function Navbar() {
             <div className="mt-auto pt-5 border-t border-line space-y-3">
               {user ? (
                 <>
-                  <p className="text-sm text-neutral-600 break-all">
-                    {user.email}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <span className="w-10 h-10 rounded-full bg-brand text-ink grid place-items-center font-bold shrink-0">
+                      {initialOf(fullName, user.email)}
+                    </span>
+                    <div className="min-w-0">
+                      {fullName && (
+                        <p className="text-sm font-semibold truncate">{fullName}</p>
+                      )}
+                      <p className="text-xs text-neutral-600 truncate">
+                        {user.email}
+                      </p>
+                    </div>
+                  </div>
                   <button
                     onClick={handleLogout}
                     className="btn-outline w-full"

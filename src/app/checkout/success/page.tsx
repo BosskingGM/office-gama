@@ -35,7 +35,7 @@ export default function SuccessPage() {
         <div className="space-y-4 pt-4">
 
           <Link
-            href="/cuenta"
+            href="/cuenta/pedidos"
             className="block w-full bg-[#d6a8ff] text-black font-semibold py-4 rounded-2xl hover:opacity-90 transition"
           >
             Ver mis pedidos

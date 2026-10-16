@@ -47,7 +47,7 @@ export default function Footer() {
               </Link>
             </li>
             <li>
-              <Link href="/cuenta" className="hover:text-brand-strong transition">
+              <Link href="/cuenta/pedidos" className="hover:text-brand-strong transition">
                 Mis pedidos
               </Link>
             </li>
