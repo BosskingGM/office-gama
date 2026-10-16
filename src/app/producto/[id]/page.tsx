@@ -29,10 +29,19 @@ const getProduct = cache(async (id: string) => {
 
   if (error || !product) return null;
 
-  const { data: variants } = await supabase
+  // extra_images = fotos adicionales por modelo. Si esa columna aún no existe
+  // en la base de datos, se pide sin ella y la página sigue funcionando.
+  let { data: variants, error: vErr } = await supabase
     .from("product_variants")
-    .select("id, model_name, image_url, stock")
+    .select("id, model_name, image_url, stock, extra_images")
     .eq("product_id", id);
+  if (vErr) {
+    const retry = await supabase
+      .from("product_variants")
+      .select("id, model_name, image_url, stock")
+      .eq("product_id", id);
+    variants = retry.data as typeof variants;
+  }
 
   return { product, variants: variants ?? [] };
 });

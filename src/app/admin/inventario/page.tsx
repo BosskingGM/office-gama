@@ -24,6 +24,7 @@ type DbVariant = {
   model_name: string | null;
   stock: number | null;
   image_url: string | null;
+  extra_images?: string[] | null; // fotos adicionales, en orden
 };
 
 type DbProduct = {
@@ -37,6 +38,14 @@ type DbProduct = {
 
 // Un modelo dentro del formulario. Todo producto tiene al menos uno:
 // la tienda vende, cuenta stock y muestra la foto por modelo.
+// Foto adicional de un modelo: o ya está guardada (url) o es nueva (blob).
+type ExtraPhoto = {
+  key: string;
+  blob: Blob | null;
+  previewUrl: string | null;
+  url: string | null;
+};
+
 type VariantForm = {
   key: string;
   id: string | null; // null = modelo nuevo
@@ -45,6 +54,7 @@ type VariantForm = {
   imageBlob: Blob | null; // foto nueva ya reducida
   previewUrl: string | null; // vista previa de la foto nueva
   existingImageUrl: string | null; // foto que ya está guardada
+  extras: ExtraPhoto[]; // más fotos del mismo modelo
 };
 
 type Notice = { kind: "ok" | "warn" | "error"; text: string };
@@ -52,6 +62,7 @@ type Notice = { kind: "ok" | "warn" | "error"; text: string };
 const SINGLE_NAME = "Único";
 const LOW_STOCK = 5;
 const BUCKET = "products";
+const MAX_EXTRAS = 6; // fotos adicionales por modelo (además de la principal)
 
 const CATEGORIES = [
   "Sacapuntas", "Libretas", "Washi Tapes", "Stickers", "Tintas", "Sellos",
@@ -71,6 +82,7 @@ const emptyVariant = (name = ""): VariantForm => ({
   imageBlob: null,
   previewUrl: null,
   existingImageUrl: null,
+  extras: [],
 });
 
 const money = (n: number | string) =>
@@ -196,6 +208,10 @@ export default function InventarioPage() {
   const [photoBusy, setPhotoBusy] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState(false);
+  // false si todavía no se corrió supabase/product-images.sql
+  const [extrasOk, setExtrasOk] = useState(true);
+  // Fotos adicionales guardadas que se quitaron en el formulario (se borran al guardar)
+  const [removedExtraUrls, setRemovedExtraUrls] = useState<string[]>([]);
 
   // Eliminar
   const [toDelete, setToDelete] = useState<DbProduct | null>(null);
@@ -212,18 +228,29 @@ export default function InventarioPage() {
     setLoadingList(true);
     setLoadError("");
 
-    const cols =
-      "id, name, price, description, category, product_variants ( id, model_name, stock, image_url )";
+    const fetchAll = async (withExtras: boolean) => {
+      const cols = `id, name, price, description, category, product_variants ( id, model_name, stock, image_url${
+        withExtras ? ", extra_images" : ""
+      } )`;
+      // Intenta ordenar por fecha; si la tabla no tiene esa columna, ordena por nombre.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let r: any = await supabase
+        .from("products")
+        .select(`${cols}, created_at`)
+        .order("created_at", { ascending: false });
+      if (r.error) {
+        r = await supabase.from("products").select(cols).order("name");
+      }
+      return r;
+    };
 
-    // Intenta ordenar por fecha; si la tabla no tiene esa columna, ordena por nombre.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let res: any = await supabase
-      .from("products")
-      .select(`${cols}, created_at`)
-      .order("created_at", { ascending: false });
-
-    if (res.error) {
-      res = await supabase.from("products").select(cols).order("name");
+    // Si aún no existe la columna de fotos extra, se carga sin ella y se avisa.
+    let res = await fetchAll(true);
+    if (res.error && /extra_images/i.test(res.error.message ?? "")) {
+      setExtrasOk(false);
+      res = await fetchAll(false);
+    } else if (!res.error) {
+      setExtrasOk(true);
     }
 
     if (res.error) {
@@ -276,6 +303,7 @@ export default function InventarioPage() {
     setFormError("");
     setPhotoError({});
     setPhotoBusy(null);
+    setRemovedExtraUrls([]);
     setDirty(false);
   };
 
@@ -310,6 +338,12 @@ export default function InventarioPage() {
             imageBlob: null,
             previewUrl: null,
             existingImageUrl: v.image_url,
+            extras: (v.extra_images ?? []).map((url) => ({
+              key: nextKey(),
+              blob: null,
+              previewUrl: null,
+              url,
+            })),
           }))
     );
     setPanelOpen(true);
@@ -364,6 +398,7 @@ export default function InventarioPage() {
   const removeVariant = (v: VariantForm) => {
     touch();
     dropPreview(v.previewUrl);
+    v.extras.forEach((x) => dropPreview(x.previewUrl));
     if (v.id) {
       setRemoved((r) => [
         ...r,
@@ -410,6 +445,97 @@ export default function InventarioPage() {
     } finally {
       setPhotoBusy(null);
     }
+  };
+
+  // Agrega varias fotos de golpe a un modelo (hasta MAX_EXTRAS).
+  const addExtraPhotos = async (v: VariantForm, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const room = MAX_EXTRAS - v.extras.length;
+    const picked = Array.from(files).slice(0, Math.max(room, 0));
+    if (picked.length === 0) return;
+
+    const busyKey = `x-${v.key}`;
+    setPhotoError((e) => ({ ...e, [busyKey]: "" }));
+    setPhotoBusy(busyKey);
+
+    const added: ExtraPhoto[] = [];
+    let failed = "";
+    for (const file of picked) {
+      try {
+        const blob = await prepareImage(file);
+        added.push({
+          key: nextKey(),
+          blob,
+          previewUrl: makePreview(blob),
+          url: null,
+        });
+      } catch (err) {
+        failed = err instanceof Error ? err.message : "No se pudo usar una foto.";
+      }
+    }
+
+    if (added.length > 0) {
+      touch();
+      setVariants((list) =>
+        list.map((x) =>
+          x.key === v.key ? { ...x, extras: [...x.extras, ...added] } : x
+        )
+      );
+    }
+    const skipped = files.length - picked.length;
+    const msg = [
+      failed,
+      skipped > 0 ? `Solo caben ${MAX_EXTRAS} fotos extra por modelo.` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    if (msg) setPhotoError((e) => ({ ...e, [busyKey]: msg }));
+    setPhotoBusy(null);
+  };
+
+  const removeExtra = (v: VariantForm, ex: ExtraPhoto) => {
+    touch();
+    dropPreview(ex.previewUrl);
+    if (ex.url) setRemovedExtraUrls((r) => [...r, ex.url as string]);
+    setVariants((list) =>
+      list.map((x) =>
+        x.key === v.key
+          ? { ...x, extras: x.extras.filter((e) => e.key !== ex.key) }
+          : x
+      )
+    );
+  };
+
+  // Intercambia la foto principal con una extra.
+  const makeCover = (v: VariantForm, ex: ExtraPhoto) => {
+    touch();
+    // Si la principal era una foto nueva que reemplazaba a otra guardada,
+    // esa guardada ya no se usa: se borrará al guardar.
+    let oldMain: ExtraPhoto;
+    if (v.imageBlob && v.existingImageUrl) {
+      setRemovedExtraUrls((r) => [...r, v.existingImageUrl as string]);
+      oldMain = { key: nextKey(), blob: v.imageBlob, previewUrl: v.previewUrl, url: null };
+    } else {
+      oldMain = {
+        key: nextKey(),
+        blob: v.imageBlob,
+        previewUrl: v.previewUrl,
+        url: v.existingImageUrl,
+      };
+    }
+    setVariants((list) =>
+      list.map((x) =>
+        x.key !== v.key
+          ? x
+          : {
+              ...x,
+              imageBlob: ex.blob,
+              previewUrl: ex.previewUrl,
+              existingImageUrl: ex.url,
+              extras: x.extras.map((e) => (e.key === ex.key ? oldMain : e)),
+            }
+      )
+    );
   };
 
   /* ---------- Validación ---------- */
@@ -503,6 +629,29 @@ export default function InventarioPage() {
           .publicUrl;
       }
 
+      // 1b. Subir fotos adicionales nuevas
+      const extraUrls: Record<string, string> = {};
+      for (const v of variants) {
+        for (const ex of v.extras) {
+          if (!ex.blob) continue;
+          const path = `${crypto.randomUUID()}.jpg`;
+          const { error } = await supabase.storage
+            .from(BUCKET)
+            .upload(path, ex.blob, {
+              contentType: "image/jpeg",
+              cacheControl: "31536000",
+            });
+          if (error) {
+            throw new Error(
+              `No se pudo subir una foto extra de "${v.model_name || SINGLE_NAME}": ${error.message}`
+            );
+          }
+          uploaded.push(path);
+          extraUrls[ex.key] = supabase.storage.from(BUCKET).getPublicUrl(path).data
+            .publicUrl;
+        }
+      }
+
       // 2. Producto
       const productData = {
         name: name.trim(),
@@ -542,6 +691,14 @@ export default function InventarioPage() {
           model_name: multi ? v.model_name.trim() : SINGLE_NAME,
           stock: parseInt(v.stock.trim(), 10),
           image_url: urls[v.key] ?? v.existingImageUrl,
+          // Solo se manda si la columna ya existe en la base de datos
+          ...(extrasOk
+            ? {
+                extra_images: v.extras
+                  .map((ex) => (ex.blob ? extraUrls[ex.key] : ex.url))
+                  .filter((u): u is string => !!u),
+              }
+            : {}),
         },
       }));
 
@@ -589,7 +746,8 @@ export default function InventarioPage() {
       const orphan = rows
         .filter((r) => r.v.imageBlob && r.v.existingImageUrl)
         .map((r) => r.v.existingImageUrl);
-      if (orphan.length > 0) await removeFiles(orphan);
+      const unused = [...orphan, ...removedExtraUrls];
+      if (unused.length > 0) await removeFiles(unused);
 
       dropAllPreviews();
       setPanelOpen(false);
@@ -685,7 +843,9 @@ export default function InventarioPage() {
         throw new Error(`No se pudo borrar el producto: ${pErr.message}`);
       }
 
-      await removeFiles(vs.map((v) => v.image_url));
+      await removeFiles(
+        vs.flatMap((v) => [v.image_url, ...(v.extra_images ?? [])])
+      );
       const gone = toDelete.name;
       setToDelete(null);
       await revalidateStore();
@@ -1239,6 +1399,95 @@ export default function InventarioPage() {
                             </Field>
                           </div>
                         </div>
+
+                        {/* Más fotos del mismo modelo */}
+                        {extrasOk ? (
+                          <div className="mt-4 pt-4 border-t border-line">
+                            <p className="text-sm font-semibold">
+                              Más fotos{" "}
+                              <span className="font-normal text-muted">
+                                (opcional, hasta {MAX_EXTRAS})
+                              </span>
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {v.extras.map((ex, xi) => {
+                                const src = ex.previewUrl ?? ex.url;
+                                if (!src) return null;
+                                return (
+                                  <div
+                                    key={ex.key}
+                                    className="relative w-20 h-20 rounded-xl overflow-hidden border border-line bg-white"
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={src}
+                                      alt={`Foto extra ${xi + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => removeExtra(v, ex)}
+                                      aria-label={`Quitar foto extra ${xi + 1}`}
+                                      className="absolute top-1 right-1 w-6 h-6 grid place-items-center rounded-full bg-white/90 shadow-sm text-neutral-700 hover:text-danger"
+                                    >
+                                      <X size={14} aria-hidden="true" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => makeCover(v, ex)}
+                                      className="absolute inset-x-0 bottom-0 bg-ink/60 text-white text-[10px] font-semibold py-0.5 hover:bg-ink/80"
+                                    >
+                                      Hacer portada
+                                    </button>
+                                  </div>
+                                );
+                              })}
+
+                              {v.extras.length < MAX_EXTRAS && (
+                                <>
+                                  <input
+                                    id={`extra-${v.key}`}
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="sr-only"
+                                    onChange={(ev) => {
+                                      addExtraPhotos(v, ev.target.files);
+                                      ev.target.value = "";
+                                    }}
+                                  />
+                                  <label
+                                    htmlFor={`extra-${v.key}`}
+                                    className="relative w-20 h-20 rounded-xl border-2 border-dashed border-brand bg-white hover:bg-brand-soft grid place-items-center cursor-pointer text-brand-strong text-center"
+                                  >
+                                    {photoBusy === `x-${v.key}` ? (
+                                      <Loader2
+                                        size={20}
+                                        className="animate-spin"
+                                        aria-label="Procesando fotos"
+                                      />
+                                    ) : (
+                                      <span className="flex flex-col items-center gap-0.5 text-[11px] font-medium">
+                                        <Plus size={18} aria-hidden="true" />
+                                        Agregar
+                                      </span>
+                                    )}
+                                  </label>
+                                </>
+                              )}
+                            </div>
+                            {photoError[`x-${v.key}`] && (
+                              <p className="mt-2 text-sm text-danger" role="alert">
+                                {photoError[`x-${v.key}`]}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-xs text-muted">
+                            Para subir más fotos por modelo, corre primero el archivo
+                            supabase/product-images.sql en Supabase.
+                          </p>
+                        )}
 
                         {(e?.photo || photoError[v.key]) && (
                           <p className="mt-2 text-sm text-danger" role="alert">

@@ -1,7 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { Check, ImageOff, Minus, Plus, ShoppingBag, Truck } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ImageOff,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Truck,
+} from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import WishlistButton from "@/components/WishlistButton";
 
@@ -9,6 +18,7 @@ type Variant = {
   id: string;
   model_name: string | null;
   image_url: string | null;
+  extra_images?: string[] | null;
   stock: number | null;
 };
 
@@ -44,6 +54,19 @@ export default function ProductDetail({
   const stock = selected?.stock ?? 0;
   const soldOut = stock <= 0;
   const withPhoto = variants.filter((v) => v.image_url);
+
+  // Fotos del modelo elegido: la principal y luego las adicionales
+  const photos = selected
+    ? [selected.image_url, ...(selected.extra_images ?? [])].filter(
+        (u): u is string => !!u
+      )
+    : [];
+  const [photoIdx, setPhotoIdx] = useState(0);
+  const [touchX, setTouchX] = useState<number | null>(null);
+  useEffect(() => setPhotoIdx(0), [selectedId]);
+  const idx = Math.min(photoIdx, Math.max(photos.length - 1, 0));
+  const go = (d: number) =>
+    photos.length > 1 && setPhotoIdx((idx + d + photos.length) % photos.length);
 
   const selectVariant = (id: string) => {
     setSelectedId(id);
@@ -90,10 +113,19 @@ export default function ProductDetail({
       <div className="grid md:grid-cols-2 gap-5 sm:gap-8 lg:gap-14 items-start">
         {/* GALERÍA */}
         <div className="space-y-3 md:sticky md:top-28">
-          <div className="relative aspect-[5/4] sm:aspect-square rounded-2xl overflow-hidden bg-brand-soft border border-line">
-            {selected?.image_url ? (
+          <div
+            className="relative aspect-[5/4] sm:aspect-square rounded-2xl overflow-hidden bg-brand-soft border border-line"
+            onTouchStart={(e) => setTouchX(e.touches[0].clientX)}
+            onTouchEnd={(e) => {
+              if (touchX === null) return;
+              const dx = e.changedTouches[0].clientX - touchX;
+              setTouchX(null);
+              if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+            }}
+          >
+            {photos[idx] ? (
               <img
-                src={selected.image_url}
+                src={photos[idx]}
                 alt={`${product.name}${
                   selected.model_name ? ` - ${selected.model_name}` : ""
                 }`}
@@ -111,9 +143,63 @@ export default function ProductDetail({
                 Agotado
               </span>
             )}
+            {photos.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => go(-1)}
+                  aria-label="Foto anterior"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 grid place-items-center rounded-full bg-white/90 shadow-sm hover:bg-white transition"
+                >
+                  <ChevronLeft size={20} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => go(1)}
+                  aria-label="Foto siguiente"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 grid place-items-center rounded-full bg-white/90 shadow-sm hover:bg-white transition"
+                >
+                  <ChevronRight size={20} aria-hidden="true" />
+                </button>
+                <span className="absolute bottom-3 right-3 bg-ink/60 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                  {idx + 1}/{photos.length}
+                </span>
+              </>
+            )}
           </div>
 
-          {withPhoto.length > 1 && (
+          {photos.length > 1 && (
+            <div
+              className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1"
+              role="group"
+              aria-label="Fotos del producto"
+            >
+              {photos.map((src, i) => (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => setPhotoIdx(i)}
+                  aria-label={`Ver foto ${i + 1}`}
+                  aria-pressed={i === idx}
+                  className={`shrink-0 w-14 h-14 sm:w-20 sm:h-20 rounded-xl overflow-hidden border-2 transition ${
+                    i === idx
+                      ? "border-brand-strong"
+                      : "border-transparent hover:border-brand"
+                  }`}
+                >
+                  <img
+                    src={src}
+                    alt=""
+                    loading="lazy"
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Miniaturas por modelo: solo cuando el modelo elegido tiene una foto */}
+          {photos.length <= 1 && withPhoto.length > 1 && (
             <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
               {withPhoto.map((v) => (
                 <button
