@@ -17,9 +17,13 @@ export const STORE_ADDRESS_FULL =
 export const STORE_ADDRESS_SHORT =
   "Texcaltlipoca, Culturas de México, Chalco de Díaz Covarrubias";
 
-// Enlace a Google Maps.
+// Ubicación exacta del local en Google Maps (Plus Code).
+// TODOS los enlaces "ver en el mapa" del sitio y de los correos usan este valor.
+export const STORE_PLUS_CODE =
+  "739W+M35 Chalco de Díaz Covarrubias, Estado de México";
+
 export const STORE_MAPS_URL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-  STORE_ADDRESS_FULL
+  STORE_PLUS_CODE
 )}`;
 
 // Datos que se guardan en el pedido cuando el cliente elige "Recoger en tienda"
