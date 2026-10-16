@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Heart,
   LayoutGrid,
   Lock,
   MapPin,
@@ -21,6 +22,7 @@ import {
 const LINKS = [
   { href: "/cuenta", label: "Resumen", icon: LayoutGrid, exact: true },
   { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package },
+  { href: "/favoritos", label: "Favoritos", icon: Heart },
   { href: "/cuenta/perfil", label: "Mis datos", icon: UserIcon },
   { href: "/cuenta/direcciones", label: "Direcciones", icon: MapPin },
   { href: "/cuenta/seguridad", label: "Seguridad", icon: Lock },

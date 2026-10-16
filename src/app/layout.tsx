@@ -1,4 +1,5 @@
 import { CartProvider } from "@/context/CartContext";
+import { WishlistProvider } from "@/context/WishlistContext";
 import Navbar from "@/components/navbar";
 import AuthListener from "@/components/AuthListener";
 import Footer from "@/components/Footer";
@@ -66,6 +67,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${bricolage.variable} bg-soft text-ink min-h-screen flex flex-col antialiased`}
       >
         <CartProvider>
+          <WishlistProvider>
           <a
             href="#contenido"
             className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:bg-white focus:px-4 focus:py-2 focus:rounded-full focus:shadow-lg"
@@ -84,6 +86,7 @@ export default function RootLayout({
           </main>
 
           <Footer />
+          </WishlistProvider>
         </CartProvider>
       </body>
     </html>

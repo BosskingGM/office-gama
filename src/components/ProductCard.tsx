@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, ImageOff, ShoppingBag } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import WishlistButton from "@/components/WishlistButton";
 
 type Variant = {
   id: string;
@@ -87,6 +88,8 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <article className="card card-hover overflow-hidden flex flex-col group">
       {/* Imagen */}
+      <div className="relative">
+      <WishlistButton productId={product.id} productName={product.name} />
       <Link
         href={href}
         className="relative block w-full aspect-[5/4] sm:aspect-square bg-brand-soft overflow-hidden"
@@ -144,6 +147,7 @@ export default function ProductCard({ product }: { product: Product }) {
           </div>
         )}
       </Link>
+      </div>
 
       {/* Contenido */}
       <div className="flex flex-col flex-1 p-2.5 sm:p-3 gap-0.5">

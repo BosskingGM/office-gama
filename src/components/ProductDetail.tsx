@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, ImageOff, Minus, Plus, ShoppingBag, Truck } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import WishlistButton from "@/components/WishlistButton";
 
 type Variant = {
   id: string;
@@ -259,6 +260,7 @@ export default function ProductDetail({
               </button>
             </div>
 
+            <div className="flex gap-3 flex-1">
             <button
               onClick={handleAdd}
               disabled={soldOut || !selected}
@@ -277,6 +279,12 @@ export default function ProductDetail({
                 </>
               )}
             </button>
+            <WishlistButton
+              productId={product.id}
+              productName={product.name}
+              variant="detail"
+            />
+            </div>
           </div>
 
           {error && (

@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import {
   ChevronDown,
+  Heart,
   LayoutGrid,
   Lock,
   LogOut,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/account";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/context/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
 import CartDrawer from "@/components/CartDrawer";
 
 export default function Navbar() {
@@ -38,6 +40,7 @@ export default function Navbar() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const { count, hydrated, openCart } = useCart();
+  const { count: favCount, hydrated: favReady } = useWishlist();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -150,6 +153,24 @@ export default function Navbar() {
         : "text-neutral-700 hover:text-brand-strong"
     }`;
 
+  const favButton = (
+    <Link
+      href="/favoritos"
+      aria-label={`Mis favoritos${favCount ? `, ${favCount}` : ""}`}
+      className="relative w-11 h-11 grid place-items-center rounded-full hover:bg-brand-soft transition"
+    >
+      <Heart
+        size={22}
+        className={pathname === "/favoritos" ? "text-brand-strong fill-current" : ""}
+      />
+      {favReady && favCount > 0 && (
+        <span className="absolute top-0.5 right-0 min-w-5 h-5 px-1 grid place-items-center bg-brand text-ink text-[11px] font-bold rounded-full ring-2 ring-white">
+          {favCount > 99 ? "99+" : favCount}
+        </span>
+      )}
+    </Link>
+  );
+
   const cartButton = (
     <button
       onClick={openCart}
@@ -205,6 +226,7 @@ export default function Navbar() {
               </Link>
             )}
 
+            {favButton}
             {cartButton}
 
             {user ? (
@@ -246,6 +268,7 @@ export default function Navbar() {
                     {[
                       { href: "/cuenta", label: "Resumen", icon: LayoutGrid },
                       { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package },
+                      { href: "/favoritos", label: "Mis favoritos", icon: Heart },
                       { href: "/cuenta/perfil", label: "Mis datos", icon: UserIcon },
                       { href: "/cuenta/direcciones", label: "Direcciones", icon: MapPin },
                       { href: "/cuenta/seguridad", label: "Seguridad", icon: Lock },
@@ -287,6 +310,7 @@ export default function Navbar() {
 
           {/* Móvil */}
           <div className="md:hidden flex items-center gap-1">
+            {favButton}
             {cartButton}
             <button
               onClick={() => setOpen(true)}
@@ -342,6 +366,7 @@ export default function Navbar() {
                   {[
                     { href: "/cuenta", label: "Resumen", icon: LayoutGrid },
                     { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package },
+                    { href: "/favoritos", label: "Mis favoritos", icon: Heart },
                     { href: "/cuenta/perfil", label: "Mis datos", icon: UserIcon },
                     { href: "/cuenta/direcciones", label: "Direcciones", icon: MapPin },
                     { href: "/cuenta/seguridad", label: "Seguridad", icon: Lock },
