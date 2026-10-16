@@ -14,8 +14,15 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/context/CartContext";
+import LocationPicker from "@/components/LocationPicker";
 import {
+  LOCAL_CITIES,
+  LOCAL_COVERAGE_TEXT,
   SHIPPING_OPTIONS,
+  isInsideLocalZone,
+  isInsideMexico,
+  matchLocalCity,
+  type LatLng,
   type ShippingType,
 } from "@/lib/shipping";
 
@@ -32,7 +39,7 @@ const STORE = {
 
 const SHIPPING_NOTES: Record<ShippingType, string> = {
   pickup: "Calle Chalco 26, Santa Bárbara, Ixtapaluca",
-  local: "Costo fijo",
+  local: `${LOCAL_COVERAGE_TEXT} · costo fijo`,
   paqueteria: "Envío a todo México",
 };
 
@@ -44,8 +51,10 @@ type FormState = {
   address: string;
   city: string;
   postal_code: string;
+  latitude: number | null;
+  longitude: number | null;
 };
-type Errors = Partial<Record<keyof FormState, string>>;
+type Errors = Partial<Record<keyof FormState | "location", string>>;
 
 type SavedAddress = {
   id: string;
@@ -64,10 +73,13 @@ const EMPTY: FormState = {
   address: "",
   city: "",
   postal_code: "",
+  latitude: null,
+  longitude: null,
 };
 
 // Mismas reglas que el servidor (create-checkout-session)
-function validate(f: FormState, needsAddress: boolean): Errors {
+function validate(f: FormState, shippingType: ShippingType): Errors {
+  const needsAddress = shippingType !== "pickup";
   const e: Errors = {};
   if (!f.full_name.trim()) e.full_name = "Escribe tu nombre completo";
   if (f.phone.replace(/\D/g, "").length < 10)
@@ -77,6 +89,21 @@ function validate(f: FormState, needsAddress: boolean): Errors {
     if (!f.city.trim()) e.city = "Escribe tu ciudad";
     if (!/^\d{5}$/.test(f.postal_code))
       e.postal_code = "El código postal tiene 5 dígitos";
+
+    const pin: LatLng | null =
+      f.latitude !== null && f.longitude !== null
+        ? { lat: f.latitude, lng: f.longitude }
+        : null;
+
+    if (shippingType === "local") {
+      if (!matchLocalCity(f.city))
+        e.city = `La entrega local es ${LOCAL_COVERAGE_TEXT.toLowerCase()}`;
+      if (!pin) e.location = "Marca tu domicilio en el mapa para la entrega local";
+      else if (!isInsideLocalZone(pin))
+        e.location = "El pin está fuera de nuestra zona de entrega local (Chalco e Ixtapaluca)";
+    } else if (pin && !isInsideMexico(pin)) {
+      e.location = "El pin debe estar dentro de México";
+    }
   }
   return e;
 }
@@ -141,6 +168,8 @@ export default function CarritoPage() {
         address: f.address || def?.address || "",
         city: f.city || def?.city || "",
         postal_code: f.postal_code || def?.postal_code || "",
+        latitude: f.latitude,
+        longitude: f.longitude,
       }));
     })();
     return () => {
@@ -183,9 +212,41 @@ export default function CarritoPage() {
     });
   }, [hydrated]);
 
-  const setField = (key: keyof FormState, value: string) => {
+  const setField = (
+    key: "full_name" | "phone" | "address" | "city" | "postal_code",
+    value: string
+  ) => {
     setForm((f) => ({ ...f, [key]: value }));
     if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
+  };
+
+  const setPin = (p: LatLng | null) => {
+    setForm((f) => ({
+      ...f,
+      latitude: p ? p.lat : null,
+      longitude: p ? p.lng : null,
+    }));
+    if (errors.location) setErrors((e) => ({ ...e, location: undefined }));
+  };
+
+  const chooseShipping = (key: ShippingType) => {
+    setShippingType(key);
+    setErrors({});
+    if (key === "local") {
+      // La entrega local solo existe en Chalco e Ixtapaluca: se obliga a elegir.
+      setForm((f) => {
+        const pinOutside =
+          f.latitude !== null &&
+          f.longitude !== null &&
+          !isInsideLocalZone({ lat: f.latitude, lng: f.longitude });
+        return {
+          ...f,
+          city: matchLocalCity(f.city) ?? "",
+          latitude: pinOutside ? null : f.latitude,
+          longitude: pinOutside ? null : f.longitude,
+        };
+      });
+    }
   };
 
   const handleCheckout = async () => {
@@ -196,7 +257,7 @@ export default function CarritoPage() {
       return;
     }
 
-    const found = validate(form, needsAddress);
+    const found = validate(form, shippingType);
     setErrors(found);
     if (Object.keys(found).length > 0) {
       document
@@ -226,6 +287,8 @@ export default function CarritoPage() {
             address: form.address.trim(),
             city: form.city.trim(),
             postal_code: form.postal_code,
+            latitude: form.latitude,
+            longitude: form.longitude,
           }
         : {
             full_name: form.full_name.trim(),
@@ -292,10 +355,10 @@ export default function CarritoPage() {
     );
   }
 
-  const fieldClass = (k: keyof FormState) =>
+  const fieldClass = (k: keyof FormState | "location") =>
     `field ${errors[k] ? "border-danger!" : ""}`;
 
-  const Err = ({ k }: { k: keyof FormState }) =>
+  const Err = ({ k }: { k: keyof FormState | "location" }) =>
     errors[k] ? (
       <p id={`err-${k}`} role="alert" className="text-xs text-danger mt-1.5">
         {errors[k]}
@@ -428,7 +491,7 @@ export default function CarritoPage() {
                     type="button"
                     role="radio"
                     aria-checked={active}
-                    onClick={() => setShippingType(key)}
+                    onClick={() => chooseShipping(key)}
                     className={`text-left rounded-2xl border-2 p-4 transition ${
                       active
                         ? "border-brand-strong bg-brand-soft"
@@ -472,6 +535,8 @@ export default function CarritoPage() {
                         address: a.address,
                         city: a.city,
                         postal_code: a.postal_code,
+                        latitude: null,
+                        longitude: null,
                       });
                       setErrors({});
                     }}
@@ -525,6 +590,21 @@ export default function CarritoPage() {
 
                 {needsAddress ? (
                   <>
+                    {shippingType === "local" && (
+                      <p className="sm:col-span-2 text-sm text-neutral-700 bg-brand-soft border border-brand rounded-xl px-4 py-3">
+                        <strong>Entrega local disponible únicamente en Chalco e
+                        Ixtapaluca.</strong>{" "}
+                        Si vives en otra zona, elige{" "}
+                        <button
+                          type="button"
+                          onClick={() => chooseShipping("paqueteria")}
+                          className="font-semibold underline"
+                        >
+                          Paquetería nacional
+                        </button>
+                        .
+                      </p>
+                    )}
                     <div className="sm:col-span-2">
                       <label htmlFor="address" className="text-sm font-medium mb-1.5 block">
                         Dirección
@@ -546,15 +626,33 @@ export default function CarritoPage() {
                       <label htmlFor="city" className="text-sm font-medium mb-1.5 block">
                         Ciudad
                       </label>
-                      <input
-                        id="city"
-                        autoComplete="address-level2"
-                        value={form.city}
-                        onChange={(e) => setField("city", e.target.value)}
-                        aria-invalid={!!errors.city}
-                        aria-describedby={errors.city ? "err-city" : undefined}
-                        className={fieldClass("city")}
-                      />
+                      {shippingType === "local" ? (
+                        <select
+                          id="city"
+                          value={matchLocalCity(form.city) ?? ""}
+                          onChange={(e) => setField("city", e.target.value)}
+                          aria-invalid={!!errors.city}
+                          aria-describedby={errors.city ? "err-city" : undefined}
+                          className={fieldClass("city")}
+                        >
+                          <option value="">Elige tu municipio…</option>
+                          {LOCAL_CITIES.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          id="city"
+                          autoComplete="address-level2"
+                          value={form.city}
+                          onChange={(e) => setField("city", e.target.value)}
+                          aria-invalid={!!errors.city}
+                          aria-describedby={errors.city ? "err-city" : undefined}
+                          className={fieldClass("city")}
+                        />
+                      )}
                       <Err k="city" />
                     </div>
 
@@ -576,6 +674,25 @@ export default function CarritoPage() {
                         className={fieldClass("postal_code")}
                       />
                       <Err k="postal_code" />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <LocationPicker
+                        key={shippingType}
+                        zone={shippingType === "local" ? "local" : "mexico"}
+                        value={
+                          form.latitude !== null && form.longitude !== null
+                            ? { lat: form.latitude, lng: form.longitude }
+                            : null
+                        }
+                        onChange={setPin}
+                        error={errors.location}
+                      />
+                      {shippingType === "paqueteria" && (
+                        <p className="text-xs text-muted mt-1.5">
+                          Opcional: ayuda a que la paquetería ubique tu domicilio con más precisión.
+                        </p>
+                      )}
                     </div>
                   </>
                 ) : (

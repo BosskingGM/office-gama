@@ -88,6 +88,13 @@ export async function POST(req: Request) {
 
   const items = cart.items as CartItem[];
   const customer = cart.customer as Record<string, string>;
+  const latitude = Number((cart.customer as any)?.latitude);
+  const longitude = Number((cart.customer as any)?.longitude);
+  const hasPin =
+    (cart.customer as any)?.latitude != null &&
+    (cart.customer as any)?.longitude != null &&
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude);
   const total = session.amount_total ? session.amount_total / 100 : 0;
 
   const { data: order, error: orderError } = await supabaseAdmin
@@ -103,6 +110,8 @@ export async function POST(req: Request) {
       address: customer.address || null,
       city: customer.city || null,
       postal_code: customer.postal_code || null,
+      latitude: hasPin ? latitude : null,
+      longitude: hasPin ? longitude : null,
       shipping_type: cart.shipping_type,
       shipping_cost: Number(cart.shipping_cost || 0),
     })

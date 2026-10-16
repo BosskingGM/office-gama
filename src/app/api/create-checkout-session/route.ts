@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getUserFromRequest } from "@/lib/auth-server";
-import { SHIPPING_OPTIONS, isShippingType } from "@/lib/shipping";
+import {
+  LOCAL_COVERAGE_TEXT,
+  SHIPPING_OPTIONS,
+  isInsideLocalZone,
+  isInsideMexico,
+  isShippingType,
+  matchLocalCity,
+  toCoord,
+} from "@/lib/shipping";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +90,37 @@ export async function POST(req: Request) {
     }
     if (!/^\d{5}$/.test(customer.postal_code)) {
       return fail("El código postal debe tener 5 dígitos");
+    }
+
+    // Ubicación marcada en el mapa (opcional salvo en entrega local).
+    // Recoger en tienda no necesita pin.
+    let latitude = toCoord(body.customer?.latitude, 90);
+    let longitude = toCoord(body.customer?.longitude, 180);
+    if (latitude === null || longitude === null) {
+      latitude = null;
+      longitude = null;
+    }
+    const pin = latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : null;
+
+    if (shippingType === "pickup") {
+      latitude = null;
+      longitude = null;
+    } else if (shippingType === "local") {
+      // La entrega local SOLO existe en Chalco e Ixtapaluca.
+      const city = matchLocalCity(customer.city);
+      if (!city) {
+        return fail(`La entrega local es válida únicamente en: ${LOCAL_COVERAGE_TEXT.replace("Solo ", "")}. Elige paquetería para otras zonas.`);
+      }
+      customer.city = city; // nombre oficial, sin variaciones de escritura
+
+      if (!pin) {
+        return fail("Marca tu domicilio en el mapa para la entrega local");
+      }
+      if (!isInsideLocalZone(pin)) {
+        return fail("El punto marcado está fuera de nuestra zona de entrega local (Chalco e Ixtapaluca)");
+      }
+    } else if (pin && !isInsideMexico(pin)) {
+      return fail("El punto marcado en el mapa debe estar dentro de México");
     }
 
     // 4) Precios y existencias reales, leídos de la base de datos.
@@ -173,7 +212,7 @@ export async function POST(req: Request) {
         user_id: user.id,
         user_email: user.email ?? null,
         items: cartItems,
-        customer,
+        customer: { ...customer, latitude, longitude },
         shipping_type: shippingType,
         shipping_cost: shippingCost,
       })

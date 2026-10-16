@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ImageOff, Loader2, Search, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { SHIPPING_OPTIONS } from "@/lib/shipping";
+import { SHIPPING_OPTIONS, mapsLink } from "@/lib/shipping";
 import StatusBadge from "@/components/StatusBadge";
 
 /* =========================
@@ -35,6 +35,8 @@ type Order = {
   address: string | null;
   city: string | null;
   postal_code: string | null;
+  latitude: number | null;
+  longitude: number | null;
   shipping_type: string | null;
   shipping_cost: number | string | null;
   order_items: Item[] | null;
@@ -125,7 +127,7 @@ export default function AdminPedidos() {
       .select(
         `
         id, created_at, status, total, notes, full_name, user_email, phone,
-        address, city, postal_code, shipping_type, shipping_cost,
+        address, city, postal_code, latitude, longitude, shipping_type, shipping_cost,
         order_items (
           id, quantity, price, product_name, variant_name,
           product_variants ( image_url, model_name, products ( name ) )
@@ -520,6 +522,20 @@ export default function AdminPedidos() {
                         .filter(Boolean)
                         .join(", ")}
                     </p>
+                    {selected.latitude != null && selected.longitude != null ? (
+                      <a
+                        href={mapsLink({ lat: selected.latitude, lng: selected.longitude })}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block mt-1 text-brand-strong font-semibold hover:underline"
+                      >
+                        📍 Ver punto exacto en el mapa
+                      </a>
+                    ) : (
+                      <p className="text-muted text-xs mt-1">
+                        El cliente no marcó un punto en el mapa.
+                      </p>
+                    )}
                   </>
                 )}
               </Block>

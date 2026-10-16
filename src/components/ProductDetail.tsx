@@ -288,7 +288,7 @@ export default function ProductDetail({
           <div className="flex items-start gap-3 text-sm text-neutral-600 bg-peach-soft border border-peach rounded-2xl px-4 py-3.5">
             <Truck size={18} className="shrink-0 mt-0.5 text-brand-strong" />
             <p>
-              Recoge gratis en tienda, entrega local o paquetería a todo México.
+              Recoge gratis en tienda, entrega local (solo Chalco e Ixtapaluca) o paquetería a todo México.
               El costo se calcula al pagar.
             </p>
           </div>
