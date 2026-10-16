@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { SHIPPING_OPTIONS, type ShippingType } from "@/lib/shipping";
+import { STORE_ADDRESS_FULL } from "@/lib/store";
 import StatusBadge, { statusInfo } from "@/components/StatusBadge";
 
 const money = (n: number) =>
@@ -151,7 +152,7 @@ export default function PedidoPage() {
             )}
             {pickup && (
               <p className="text-muted">
-                Calle Chalco 26, Santa Bárbara, Ixtapaluca, Estado de México
+                {STORE_ADDRESS_FULL}
               </p>
             )}
           </div>

@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { Facebook, Instagram, MapPin, Phone } from "lucide-react";
-
-const MAPS_URL =
-  "https://www.google.com/maps/search/?api=1&query=Calle+Chalco+26+Santa+Barbara+Ixtapaluca+Estado+de+Mexico+56538";
+import { STORE_ADDRESS_FULL, STORE_MAPS_URL } from "@/lib/store";
 
 const linkClass =
   "flex items-center gap-3 text-neutral-600 hover:text-brand-strong transition";
@@ -89,16 +87,13 @@ export default function Footer() {
         <div>
           <h4 className="font-bold mb-5">Ubicación</h4>
           <a
-            href={MAPS_URL}
+            href={STORE_MAPS_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-start gap-3 text-sm text-neutral-600 hover:text-brand-strong transition"
           >
             <MapPin size={16} className="mt-0.5 shrink-0" />
-            <span>
-              Calle Chalco 26, Santa Bárbara, Ixtapaluca, Estado de México
-              56538
-            </span>
+            <span>{STORE_ADDRESS_FULL}</span>
           </a>
         </div>
       </div>

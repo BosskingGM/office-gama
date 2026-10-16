@@ -15,6 +15,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useCart } from "@/context/CartContext";
 import LocationPicker from "@/components/LocationPicker";
+import { STORE_ADDRESS_SHORT, STORE_PICKUP_DATA } from "@/lib/store";
 import {
   LOCAL_CITIES,
   LOCAL_COVERAGE_TEXT,
@@ -29,16 +30,8 @@ import {
 const money = (n: number) =>
   n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 
-// Para "Recoger en tienda" el pedido se guarda con la dirección de la tienda
-// (el servidor exige dirección, ciudad y código postal en todos los pedidos).
-const STORE = {
-  address: "Calle Chalco 26, Santa Bárbara (recoger en tienda)",
-  city: "Ixtapaluca",
-  postal_code: "56538",
-};
-
 const SHIPPING_NOTES: Record<ShippingType, string> = {
-  pickup: "Calle Chalco 26, Santa Bárbara, Ixtapaluca",
+  pickup: STORE_ADDRESS_SHORT,
   local: `${LOCAL_COVERAGE_TEXT} · costo fijo`,
   paqueteria: "Envío a todo México",
 };
@@ -293,7 +286,7 @@ export default function CarritoPage() {
         : {
             full_name: form.full_name.trim(),
             phone: form.phone.trim(),
-            ...STORE,
+            ...STORE_PICKUP_DATA,
           };
 
       const response = await fetch("/api/create-checkout-session", {
@@ -697,7 +690,7 @@ export default function CarritoPage() {
                   </>
                 ) : (
                   <p className="sm:col-span-2 text-sm text-neutral-600 bg-peach-soft border border-peach rounded-xl px-4 py-3">
-                    Recogerás tu pedido en {STORE.address.split(" (")[0]}, {STORE.city}.
+                    Recogerás tu pedido en {STORE_ADDRESS_SHORT}.
                     Te avisaremos cuando esté listo.
                   </p>
                 )}
