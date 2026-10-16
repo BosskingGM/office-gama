@@ -5,6 +5,7 @@ import { ImageOff, Loader2, Search, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { SHIPPING_OPTIONS, mapsLink } from "@/lib/shipping";
 import StatusBadge from "@/components/StatusBadge";
+import { revalidateStore } from "@/lib/revalidate-client";
 
 /* =========================
    TIPOS Y AYUDAS
@@ -221,6 +222,20 @@ export default function AdminPedidos() {
       text: `Pedido marcado como ${newStatus}.`,
     };
 
+    // Cancelar (o reactivar un cancelado) mueve el inventario en la base de
+    // datos (supabase/cancel-restock.sql): se refresca la tienda al instante.
+    const wasCancelled = statusOf(order) === "cancelado";
+    if (newStatus === "cancelado" || wasCancelled) {
+      await revalidateStore();
+      result = {
+        kind: "ok",
+        text:
+          newStatus === "cancelado"
+            ? "Pedido cancelado. Las piezas regresaron al inventario."
+            : `Pedido marcado como ${newStatus}. Las piezas se descontaron de nuevo del inventario.`,
+      };
+    }
+
     if (withEmail) {
       const sent = await sendShippedEmail(order.id).catch(() => false);
       result = sent
@@ -253,7 +268,7 @@ export default function AdminPedidos() {
 
   const cancelOrder = (order: Order) => {
     const ok = confirm(
-      "¿Cancelar este pedido?\n\nLas piezas no regresan solas al inventario; si hace falta, ajústalas en Inventario."
+      "¿Cancelar este pedido?\n\nLas piezas regresarán automáticamente al inventario."
     );
     if (ok) changeStatus(order, "cancelado");
   };
@@ -740,7 +755,7 @@ function Actions({
             ))}
         </div>
         <p className="mt-2 text-xs text-muted">
-          Cambia solo el estado: no envía correo ni mueve el inventario.
+          No envía correo. Poner o quitar “cancelado” sí regresa o descuenta las piezas del inventario.
         </p>
       </details>
     </>
