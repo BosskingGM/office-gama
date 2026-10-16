@@ -232,7 +232,7 @@ export async function POST(req: Request) {
       line_items,
       customer_email: user.email ?? undefined,
       client_reference_id: cart.id,
-      success_url: `${siteUrl}/checkout/success`,
+      success_url: `${siteUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/carrito`,
       metadata: { cart_id: cart.id, user_id: user.id },
     });
