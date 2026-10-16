@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -202,6 +203,18 @@ export default function RegisterPage() {
         >
           Registrarse
         </button>
+
+        <p className="text-xs text-neutral-500 text-center leading-relaxed -mt-4">
+          Al registrarte aceptas los{" "}
+          <Link href="/terminos" className="underline hover:text-neutral-900">
+            Términos y condiciones
+          </Link>{" "}
+          y el{" "}
+          <Link href="/privacidad" className="underline hover:text-neutral-900">
+            Aviso de privacidad
+          </Link>
+          .
+        </p>
 
       </div>
     </main>

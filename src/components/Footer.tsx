@@ -49,6 +49,16 @@ export default function Footer() {
                 Mis pedidos
               </Link>
             </li>
+            <li>
+              <Link href="/terminos" className="hover:text-brand-strong transition">
+                Términos y condiciones
+              </Link>
+            </li>
+            <li>
+              <Link href="/privacidad" className="hover:text-brand-strong transition">
+                Aviso de privacidad
+              </Link>
+            </li>
           </ul>
         </nav>
 
@@ -98,9 +108,19 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="border-t border-line text-center py-6 px-6 text-sm text-neutral-500">
-        © {new Date().getFullYear()} Office GaMa · Creado por Giovanni Garcia
-        Morales
+      <div className="border-t border-line text-center py-6 px-6 text-sm text-neutral-500 space-y-2">
+        <p className="flex flex-wrap justify-center gap-x-5 gap-y-1">
+          <Link href="/terminos" className="hover:text-brand-strong hover:underline">
+            Términos y condiciones
+          </Link>
+          <Link href="/privacidad" className="hover:text-brand-strong hover:underline">
+            Aviso de privacidad
+          </Link>
+        </p>
+        <p>
+          © {new Date().getFullYear()} Office GaMa · Creado por Giovanni Garcia
+          Morales
+        </p>
       </div>
     </footer>
   );
