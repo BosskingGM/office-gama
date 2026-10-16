@@ -127,7 +127,7 @@ export default function ProductDetail({
               <img
                 src={photos[idx]}
                 alt={`${product.name}${
-                  selected.model_name ? ` - ${selected.model_name}` : ""
+                  selected?.model_name ? ` - ${selected.model_name}` : ""
                 }`}
                 className={`w-full h-full object-cover ${
                   soldOut ? "opacity-60 grayscale-[40%]" : ""
