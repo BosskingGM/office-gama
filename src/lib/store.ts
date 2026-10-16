@@ -37,10 +37,10 @@ export const STORE_PICKUP_DATA = {
 // WhatsApp de la tienda (comprobantes de transferencia, dudas).
 export const STORE_WHATSAPP_URL = "https://wa.me/525618060088";
 
-// Datos para pagos por transferencia. ⚠️ REEMPLAZA estos valores por los reales:
-// se muestran al cliente al terminar su pedido y en el correo.
+// Datos para pagos por transferencia. Se muestran al cliente al terminar su
+// pedido y en el correo.
 export const BANK_TRANSFER = {
-  bank: "REEMPLAZAR: nombre del banco",
-  holder: "REEMPLAZAR: nombre del titular",
-  clabe: "REEMPLAZAR: CLABE de 18 dígitos",
+  bank: "Clip",
+  holder: "Giovanni Garcia Morales",
+  clabe: "730969100004718476",
 } as const;

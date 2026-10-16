@@ -106,7 +106,7 @@ export async function createOfflineOrder(input: Input): Promise<OfflineResult> {
       error:
         orderError && isMissingColumn(orderError)
           ? "Falta ejecutar supabase/offline-payments.sql en Supabase."
-          : "No pudimos registrar tu pedido. Intenta de nuevo.",
+          : `No pudimos registrar tu pedido. Intenta de nuevo. (error ${orderError?.code ?? "desconocido"})`,
     };
   }
 
