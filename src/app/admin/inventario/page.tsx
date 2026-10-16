@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { revalidateStore } from "@/lib/revalidate-client";
 
 /* =========================
    TIPOS Y CONSTANTES
@@ -592,6 +593,7 @@ export default function InventarioPage() {
       dropAllPreviews();
       setPanelOpen(false);
       resetForm();
+      await revalidateStore();
       await loadProducts();
 
       setNotice(
@@ -685,6 +687,7 @@ export default function InventarioPage() {
       await removeFiles(vs.map((v) => v.image_url));
       const gone = toDelete.name;
       setToDelete(null);
+      await revalidateStore();
       await loadProducts();
       setNotice({ kind: "ok", text: `Se eliminó "${gone}".` });
     } catch (err) {
@@ -711,7 +714,8 @@ export default function InventarioPage() {
     }
     const nm = toDelete.name;
     setToDelete(null);
-    await loadProducts();
+    await revalidateStore();
+      await loadProducts();
     setNotice({ kind: "ok", text: `"${nm}" quedó agotado.` });
   };
 

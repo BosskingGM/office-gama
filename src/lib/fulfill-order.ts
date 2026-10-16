@@ -6,6 +6,7 @@
 // garantiza que solo uno de los dos cree el pedido.
 
 import type Stripe from "stripe";
+import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { mapsLink } from "@/lib/shipping";
 import { sendOrderConfirmationEmail } from "@/lib/email";
@@ -178,6 +179,15 @@ export async function fulfillPaidSession(
 
   // El carrito ya cumplió su función.
   await supabaseAdmin.from("checkout_carts").delete().eq("id", cartId);
+
+  // El stock cambió: se refrescan portada y páginas de producto al instante
+  // (si no, mostrarían el stock viejo hasta que venza la caché de 1 minuto).
+  try {
+    revalidatePath("/");
+    revalidatePath("/producto/[id]", "page");
+  } catch (err) {
+    console.error("No se pudo refrescar la caché:", err);
+  }
 
   // Correo de confirmación al cliente. Si falla, el pedido igual queda guardado.
   await sendOrderConfirmationEmail(order.id);

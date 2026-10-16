@@ -1,4 +1,5 @@
-// Refresca la portada al instante después de cambiar promociones desde el admin.
+// Refresca la portada y las páginas de producto al instante después de cambiar
+// promociones, precios o inventario desde el admin.
 // Solo la puede llamar un administrador con sesión iniciada.
 
 import { revalidatePath } from "next/cache";
@@ -11,5 +12,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   revalidatePath("/");
+  revalidatePath("/producto/[id]", "page");
   return NextResponse.json({ ok: true });
 }
