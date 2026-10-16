@@ -46,7 +46,7 @@ const COLS = [
   { key: "description", header: "Descripción", width: 40, hint: "Opcional." },
   { key: "model", header: "Modelo", width: 22, hint: "Color o diseño. Vacío = \"Único\" (solo si el producto tiene 1 modelo)." },
   { key: "stock", header: "Stock *", width: 10, hint: "Piezas disponibles (0 si no hay)." },
-  { key: "photo", header: "URL foto", width: 36, hint: "Opcional. Enlace https:// de la imagen. Vacío = no cambia la foto." },
+  { key: "photo", header: "Foto (archivo o URL)", width: 30, hint: "Opcional. Nombre del archivo de la foto en tu computadora (ej. libreta-rosa.jpg; luego la eliges al subir el Excel) o un enlace https:// de internet. Vacío = no cambia la foto." },
   { key: "vid", header: "ID modelo", width: 14, hint: "NO LO CAMBIES. Déjalo vacío si el modelo es nuevo." },
 ] as const;
 type ColKey = (typeof COLS)[number]["key"];
@@ -198,7 +198,7 @@ async function buildWorkbook(products: Product[], categories: string[]) {
     ["PRECIO / CATEGORÍA", "En un producto con varios modelos, el precio y la categoría deben ser iguales en todas sus filas: si los cambias, cámbialos en todas."],
     ["MODELO NUEVO", "Agrega una fila con el mismo ID producto (o el mismo nombre) y deja vacío ID modelo."],
     ["ELIMINAR", "La carga masiva NUNCA borra nada. Para eliminar o dejar sin existencias, hazlo desde el inventario."],
-    ["FOTOS", "Opcional. Pega el enlace https:// de la imagen. También puedes agregar o cambiar fotos después desde Editar producto."],
+    ["FOTOS", "Opcional. En la columna Foto escribe el nombre exacto del archivo (ej. libreta-rosa.jpg) y, al subir el Excel, elige también esas fotos de tu computadora: el sistema las empareja por nombre. También sirve un enlace https:// de internet. Varios modelos pueden usar la misma foto."],
     ["", ""],
     ["EJEMPLO", ""],
     ["Producto con 1 modelo", "Nombre: Sacapuntas gatito | Categoría: Sacapuntas | Precio: 25 | Modelo: (vacío) | Stock: 40"],
@@ -219,7 +219,8 @@ type PlanVariant = {
   vid: string | null;
   model_name: string;
   stock: number;
-  photo: string | null;
+  photo: string | null; // URL https
+  photoFile: string | null; // nombre de archivo (minúsculas) a emparejar con las fotos elegidas
   row: number;
 };
 type PlanProduct = {
@@ -260,7 +261,7 @@ async function parseFile(
   const headRow = ws.getRow(1);
   headRow.eachCell((cell, i) => {
     const h = norm(cellText(cell.value));
-    const c = COLS.find((x) => norm(x.header) === h);
+    const c = COLS.find((x) => norm(x.header) === h || (x.key === "photo" && h === "url foto"));
     if (c) colOf[c.key] = i;
   });
   const missing = COLS.filter(
@@ -396,12 +397,23 @@ async function parseFile(
         const same = existing.product_variants?.find((v) => norm(v.model_name ?? "") === norm(model));
         if (same) vid = same.id;
       }
-      if (r.photo && !/^https:\/\//i.test(r.photo)) {
-        errors.push(`Fila ${r.n}: la URL de la foto debe empezar con https://`);
-        bad = true;
-        continue;
+      let photo: string | null = null;
+      let photoFile: string | null = null;
+      if (r.photo) {
+        if (/^https:\/\//i.test(r.photo)) {
+          photo = r.photo;
+        } else {
+          const base = r.photo.split(/[\\/]/).pop() ?? "";
+          if (/\.(jpe?g|png|webp|gif)$/i.test(base)) {
+            photoFile = base.toLowerCase();
+          } else {
+            errors.push(`Fila ${r.n}: en la columna Foto escribe el nombre del archivo (ej. foto.jpg) o un enlace https://`);
+            bad = true;
+            continue;
+          }
+        }
       }
-      variants.push({ vid, model_name: model, stock, photo: r.photo || null, row: r.n });
+      variants.push({ vid, model_name: model, stock, photo, photoFile, row: r.n });
     }
     if (bad) continue;
 
@@ -423,6 +435,50 @@ async function parseFile(
   return plan;
 }
 
+/* ---------- fotos desde la computadora ---------- */
+
+const BUCKET = "products";
+
+// Igual que en el formulario de producto: máx. 1200 px, JPG.
+async function prepareImage(file: File): Promise<Blob> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    throw new Error(`No se pudo leer la imagen "${file.name}".`);
+  }
+  const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Tu navegador no pudo procesar la imagen.");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  const blob: Blob | null = await new Promise((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.85)
+  );
+  if (!blob) throw new Error("No se pudo preparar la imagen.");
+  return blob;
+}
+
+function storagePathFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  const marker = `/storage/v1/object/public/${BUCKET}/`;
+  const i = url.indexOf(marker);
+  if (i === -1) return null;
+  const path = url.slice(i + marker.length).split("?")[0];
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
 /* =========================================================
    COMPONENTE
 ========================================================= */
@@ -441,12 +497,30 @@ export default function InventoryExcel({
   const [error, setError] = useState("");
   const [plan, setPlan] = useState<Plan | null>(null);
   const [progress, setProgress] = useState("");
+  const [photos, setPhotos] = useState<Map<string, File>>(new Map());
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Fotos que pide el Excel y que todavía no se han elegido
+  const missingPhotos = plan
+    ? [...new Set(plan.products.flatMap((p) => p.variants.map((v) => v.photoFile)).filter((f): f is string => !!f && !photos.has(f)))]
+    : [];
+
+  const addPhotos = (list: FileList | null) => {
+    if (!list) return;
+    setPhotos((prev) => {
+      const next = new Map(prev);
+      for (const f of Array.from(list)) {
+        if (f.type.startsWith("image/")) next.set(f.name.toLowerCase(), f);
+      }
+      return next;
+    });
+  };
 
   const close = () => {
     if (busy === "apply") return;
     setOpen(false);
     setPlan(null);
+    setPhotos(new Map());
     setError("");
   };
 
@@ -493,6 +567,11 @@ export default function InventoryExcel({
     setBusy("apply");
     setError("");
     const failures: string[] = [];
+    const uploadedByName = new Map<string, string>(); // nombre de archivo → URL pública
+    const oldUrls = new Map(
+      products.flatMap((p) => (p.product_variants ?? []).map((v) => [v.id, v.image_url] as const))
+    );
+    const toRemove: (string | null)[] = [];
     let done = 0;
     for (const p of plan.products) {
       done++;
@@ -518,22 +597,40 @@ export default function InventoryExcel({
           pid = created.id as string;
         }
         for (const v of p.variants) {
+          // Foto de la computadora: se reduce, se sube una sola vez y se reutiliza
+          let photoUrl = v.photo;
+          if (!photoUrl && v.photoFile && photos.has(v.photoFile)) {
+            photoUrl = uploadedByName.get(v.photoFile) ?? null;
+            if (!photoUrl) {
+              setProgress(`Subiendo foto ${v.photoFile}…`);
+              const blob = await prepareImage(photos.get(v.photoFile)!);
+              const path = `${crypto.randomUUID()}.jpg`;
+              const { error: upErr } = await supabase.storage
+                .from(BUCKET)
+                .upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
+              if (upErr) throw new Error(`No se pudo subir la foto ${v.photoFile}: ${upErr.message}`);
+              photoUrl = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+              uploadedByName.set(v.photoFile, photoUrl);
+            }
+          }
           if (v.vid) {
             const { error: e } = await supabase
               .from("product_variants")
               .update({
                 model_name: v.model_name,
                 stock: v.stock,
-                ...(v.photo ? { image_url: v.photo } : {}),
+                ...(photoUrl ? { image_url: photoUrl } : {}),
               })
               .eq("id", v.vid);
             if (e) throw new Error(e.message);
+            const old = oldUrls.get(v.vid);
+            if (photoUrl && old && old !== photoUrl) toRemove.push(old);
           } else {
             const { error: e } = await supabase.from("product_variants").insert({
               product_id: pid,
               model_name: v.model_name,
               stock: v.stock,
-              image_url: v.photo,
+              image_url: photoUrl,
             });
             if (e) throw new Error(e.message);
           }
@@ -542,9 +639,19 @@ export default function InventoryExcel({
         failures.push(`"${p.name}": ${e instanceof Error ? e.message : "error"}`);
       }
     }
+    // Limpia las fotos anteriores que ya nadie usa (solo las del propio bucket)
+    const paths = toRemove.map(storagePathFromUrl).filter((x): x is string => !!x);
+    if (paths.length) {
+      try {
+        await supabase.storage.from(BUCKET).remove(paths);
+      } catch {
+        /* limpieza opcional */
+      }
+    }
     await revalidateStore();
     setBusy("");
     setProgress("");
+    setPhotos(new Map());
     const ok = plan.products.length - failures.length;
     if (failures.length) {
       setError(`Se guardaron ${ok} de ${plan.products.length} productos. No se pudieron guardar: ${failures.join(" · ")}`);
@@ -635,6 +742,30 @@ export default function InventoryExcel({
                   </label>
                 </div>
 
+                <div className="space-y-2">
+                  <p className="text-xs text-muted leading-relaxed">
+                    <strong>¿Fotos en tu computadora?</strong> En la columna “Foto”
+                    escribe el nombre del archivo (ej.{" "}
+                    <code>libreta-rosa.jpg</code>) y elige aquí todas las fotos
+                    juntas. Se emparejan por nombre.
+                  </p>
+                  <label className="btn-outline text-sm py-2! px-4! cursor-pointer inline-flex">
+                    <FileUp size={16} />
+                    Elegir fotos{photos.size > 0 ? ` (${photos.size} elegidas)` : ""}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="sr-only"
+                      disabled={busy === "apply"}
+                      onChange={(e) => {
+                        addPhotos(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+
                 {error && (
                   <div role="alert" className="flex gap-2 text-sm text-danger bg-red-50 border border-red-200 rounded-xl px-4 py-3">
                     <AlertCircle size={18} className="shrink-0 mt-0.5" />
@@ -651,6 +782,17 @@ export default function InventoryExcel({
                           Listo para guardar: <strong>{plan.newProducts}</strong> productos nuevos y{" "}
                           <strong>{plan.updProducts}</strong> por actualizar (
                           {plan.newVariants} modelos nuevos, {plan.updVariants} por actualizar).
+                        </p>
+                      </div>
+                    )}
+                    {missingPhotos.length > 0 && (
+                      <div className="text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3">
+                        <p className="font-semibold mb-1">
+                          Faltan {missingPhotos.length} {missingPhotos.length === 1 ? "foto" : "fotos"} por elegir (si no, se guardan sin foto):
+                        </p>
+                        <p className="text-[13px] break-words">
+                          {missingPhotos.slice(0, 15).join(", ")}
+                          {missingPhotos.length > 15 ? ` …y ${missingPhotos.length - 15} más` : ""}
                         </p>
                       </div>
                     )}
