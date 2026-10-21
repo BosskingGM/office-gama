@@ -78,25 +78,30 @@ export default function CuentaLayout({
           </div>
         </div>
 
+        {/* Celular: cuadrícula 3x2 con todo a la vista (sin scroll lateral).
+            Escritorio: barra lateral vertical como antes. */}
         <nav
           aria-label="Mi cuenta"
-          className="flex md:flex-col gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 pb-1 md:sticky md:top-28"
+          className="grid grid-cols-3 gap-2 md:flex md:flex-col md:gap-2 md:sticky md:top-28"
         >
-          {LINKS.map(({ href, label, icon: Icon, exact }) => (
-            <Link
-              key={href}
-              href={href}
-              aria-current={isActive(href, exact) ? "page" : undefined}
-              className={`shrink-0 inline-flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm font-semibold transition whitespace-nowrap ${
-                isActive(href, exact)
-                  ? "bg-brand text-ink"
-                  : "text-neutral-700 hover:bg-brand-soft"
-              }`}
-            >
-              <Icon size={17} aria-hidden="true" />
-              {label}
-            </Link>
-          ))}
+          {LINKS.map(({ href, label, icon: Icon, exact }) => {
+            const active = isActive(href, exact);
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={`flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-2.5 min-h-[60px] md:min-h-0 px-2 py-2.5 md:px-4 rounded-2xl md:rounded-full text-[11px] leading-tight md:text-sm text-center md:text-left font-semibold transition active:scale-[0.97] ${
+                  active
+                    ? "bg-brand text-ink shadow-sm"
+                    : "bg-white md:bg-transparent border border-line md:border-transparent text-neutral-700 hover:bg-brand-soft"
+                }`}
+              >
+                <Icon size={20} aria-hidden="true" className="shrink-0" />
+                <span className="md:whitespace-nowrap">{label}</span>
+              </Link>
+            );
+          })}
         </nav>
       </aside>
 
