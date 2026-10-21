@@ -1,91 +1,87 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import {
-  Heart,
-  LayoutGrid,
-  Lock,
-  MapPin,
+  ClipboardList,
+  LayoutDashboard,
+  Megaphone,
   Package,
-  User as UserIcon,
+  ShieldCheck,
+  Store,
+  Ticket,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import {
-  ACCOUNT_EVENT,
-  fetchFullName,
-  firstName,
-  initialOf,
-} from "@/lib/account";
 
 const LINKS = [
-  { href: "/cuenta", label: "Resumen", icon: LayoutGrid, exact: true },
-  { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package },
-  { href: "/favoritos", label: "Favoritos", icon: Heart },
-  { href: "/cuenta/perfil", label: "Mis datos", icon: UserIcon },
-  { href: "/cuenta/direcciones", label: "Direcciones", icon: MapPin },
-  { href: "/cuenta/seguridad", label: "Seguridad", icon: Lock },
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/pedidos", label: "Pedidos", icon: ClipboardList },
+  { href: "/admin/inventario", label: "Inventario", icon: Package },
+  { href: "/admin/promociones", label: "Promociones", icon: Megaphone },
+  { href: "/admin/cupones", label: "Cupones", icon: Ticket },
+  { href: "/admin/administradores", label: "Administradores", icon: ShieldCheck },
 ];
 
-export default function CuentaLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const pathname = usePathname();
-  const [email, setEmail] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [ready, setReady] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      const { data } = await supabase.auth.getSession();
-      const user = data.session?.user;
-      if (!alive) return;
-      setEmail(user?.email ?? null);
-      if (user) {
-        const n = await fetchFullName(user.id).catch(() => "");
-        if (alive) setName(n);
-      }
-      if (alive) setReady(true);
-    };
-    load();
-    window.addEventListener(ACCOUNT_EVENT, load);
-    return () => {
-      alive = false;
-      window.removeEventListener(ACCOUNT_EVENT, load);
-    };
-  }, []);
+    const checkAdmin = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  const isActive = (href: string, exact?: boolean) =>
-    exact ? pathname === href : pathname.startsWith(href);
+      if (!user) {
+        router.replace("/login?next=/admin");
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile || profile.role !== "admin") {
+        router.replace("/");
+        return;
+      }
+
+      setChecking(false);
+    };
+
+    checkAdmin();
+  }, [router]);
+
+  if (checking) {
+    return (
+      <div className="min-h-[60vh] grid place-items-center text-muted">
+        Verificando permisos…
+      </div>
+    );
+  }
+
+  const isActive = (href: string) =>
+    href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 
   return (
-    <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-5 md:gap-10">
-      <aside className="md:w-60 shrink-0 space-y-4">
-        {/* Tarjeta del cliente */}
-        <div className="card p-4 md:p-5 flex md:flex-col items-center md:items-start gap-3.5">
-          <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-brand text-ink grid place-items-center text-xl md:text-2xl font-extrabold shrink-0">
-            {ready ? initialOf(name, email) : ""}
-          </div>
-          <div className="min-w-0">
-            <p className="font-bold truncate">
-              {ready ? (firstName(name) ? `Hola, ${firstName(name)}` : "Mi cuenta") : "…"}
-            </p>
-            <p className="text-xs text-muted truncate">{email ?? ""}</p>
-          </div>
-        </div>
-
+    <div className="flex flex-col md:flex-row gap-4 md:gap-10 py-2">
+      <aside className="md:w-52 shrink-0">
         {/* Celular: cuadrícula 3x2 con todo a la vista (sin scroll lateral).
             Escritorio: barra lateral vertical como antes. */}
         <nav
-          aria-label="Mi cuenta"
+          aria-label="Administración"
           className="grid grid-cols-3 gap-2 md:flex md:flex-col md:gap-2 md:sticky md:top-28"
         >
-          {LINKS.map(({ href, label, icon: Icon, exact }) => {
-            const active = isActive(href, exact);
+          {LINKS.map(({ href, label, icon: Icon }) => {
+            const active = isActive(href);
             return (
               <Link
                 key={href}
@@ -102,6 +98,14 @@ export default function CuentaLayout({
               </Link>
             );
           })}
+
+          <Link
+            href="/"
+            className="hidden md:inline-flex shrink-0 items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-muted hover:bg-brand-soft transition whitespace-nowrap mt-4 border-t border-line rounded-none pt-5"
+          >
+            <Store size={17} aria-hidden="true" />
+            Ver tienda
+          </Link>
         </nav>
       </aside>
 
