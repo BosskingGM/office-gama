@@ -927,7 +927,7 @@ export default function InventarioPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Encabezado */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold">Inventario</h1>
           <p className="text-sm text-muted mt-1">
@@ -938,7 +938,7 @@ export default function InventarioPage() {
                 }`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-stretch gap-2">
           <InventoryExcel
             products={products}
             categories={CATEGORIES}
@@ -947,7 +947,11 @@ export default function InventarioPage() {
               loadProducts();
             }}
           />
-          <button type="button" onClick={openNew} className="btn-primary">
+          <button
+            type="button"
+            onClick={openNew}
+            className="btn-primary flex-1 sm:flex-none justify-center whitespace-nowrap"
+          >
             <Plus size={18} aria-hidden="true" />
             Nuevo producto
           </button>
